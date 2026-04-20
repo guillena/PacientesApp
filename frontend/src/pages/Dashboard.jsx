@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../store/AuthContext';
-import { Calendar as CalendarIcon, Users, Clock, ArrowRight } from 'lucide-react';
+import { Calendar as CalendarIcon, Users, Clock, ArrowRight, CheckCircle2, Edit3, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
@@ -13,15 +13,23 @@ const Dashboard = () => {
     totalPatients: 0,
     nextAppointments: [],
   });
+  const [tasks, setTasks] = useState([]);
+  const [isAddingTask, setIsAddingTask] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [taskForm, setTaskForm] = useState({ description: '', status: 'pendiente', date: '' });
+  const [isSavingTask, setIsSavingTask] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [ptsRes, apptsRes] = await Promise.all([
+        const [ptsRes, apptsRes, tasksRes] = await Promise.all([
           api.get('/patients'),
-          api.get('/appointments')
+          api.get('/appointments'),
+          api.get('/tasks')
         ]);
+
+        setTasks(tasksRes.data);
 
         const patients = ptsRes.data;
         const appointments = apptsRes.data;
@@ -50,7 +58,7 @@ const Dashboard = () => {
         
         setStats({
           todayCount,
-          totalPatients: patients.length,
+          totalPatients: patients.filter(p => !p.isInactive).length,
           nextAppointments: upcoming.slice(0, 3)
         });
         setLoading(false);
@@ -63,6 +71,70 @@ const Dashboard = () => {
 
     fetchDashboardData();
   }, []);
+
+  const handleTaskSubmit = async (e) => {
+    e.preventDefault();
+    if (!taskForm.description.trim()) return;
+    
+    setIsSavingTask(true);
+    try {
+      const payload = { ...taskForm };
+      if (!payload.date) payload.date = null;
+      
+      if (editingTaskId) {
+        await api.patch(`/tasks/${editingTaskId}`, payload);
+      } else {
+        await api.post('/tasks', payload);
+      }
+      
+      setTaskForm({ description: '', status: 'pendiente', date: '' });
+      setEditingTaskId(null);
+      setIsAddingTask(false);
+      
+      // Refresh tasks
+      const { data } = await api.get('/tasks');
+      setTasks(data);
+    } catch (err) { 
+      console.error('Error saving task', err);
+    } finally {
+      setIsSavingTask(false);
+    }
+  };
+
+  const handleToggleTaskStatus = async (task) => {
+    const nextStatus = task.status === 'pendiente' ? 'en_ejecucion' : (task.status === 'en_ejecucion' ? 'completa' : 'pendiente');
+    try {
+      await api.patch(`/tasks/${task.id}`, { status: nextStatus });
+      const { data } = await api.get('/tasks');
+      setTasks(data);
+    } catch (err) { console.error('Error updating task', err); }
+  };
+
+  const handleEditTask = (task) => {
+    setEditingTaskId(task.id);
+    setTaskForm({
+      description: task.description,
+      status: task.status,
+      date: task.date || ''
+    });
+    setIsAddingTask(true);
+  };
+
+  const handleDeleteTask = async (id) => {
+    try {
+      await api.delete(`/tasks/${id}`);
+      const { data } = await api.get('/tasks');
+      setTasks(data);
+    } catch (err) { console.error('Error deleting task', err); }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'completa': return '#059669';
+      case 'en_ejecucion': return '#d97706';
+      default: return '#6b7280';
+    }
+  };
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -198,7 +270,10 @@ const Dashboard = () => {
                 </div>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontWeight: '600' }}>{app.Patient?.firstName} {app.Patient?.lastName}</p>
-                  <p style={{ fontSize: '0.85rem', opacity: 0.7 }}>{app.Benefit?.name}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <p style={{ fontSize: '0.85rem', opacity: 0.7 }}>{app.Benefit?.name}</p>
+                    {app.attended && <CheckCircle2 size={14} color="#059669" />}
+                  </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <p style={{ fontWeight: '600' }}>{formatDate(app.startTime)}</p>
@@ -215,14 +290,164 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="card" style={{ background: 'var(--yellow)', color: 'var(--dark-text)' }}>
-          <h3>Aviso Importante</h3>
-          <p style={{ marginTop: '1rem' }}>
-            Recuerda completar las historias clínicas antes de finalizar tu jornada.
-          </p>
-          <button className="btn" style={{ background: 'white', marginTop: '1.5rem' }}>
-            Ir a Pendientes
-          </button>
+        <div className="card" style={{ background: 'white', color: 'var(--dark-text)', display: 'flex', flexDirection: 'column', height: 'fit-content' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle2 size={20} /> Tareas
+            </h3>
+            <button 
+              className="btn" 
+              style={{ padding: '4px 10px', fontSize: '0.8rem', background: isAddingTask ? 'var(--soft-gray)' : 'var(--primary)', color: isAddingTask ? 'var(--dark-text)' : 'white' }}
+              onClick={() => {
+                if (isAddingTask) {
+                  setIsAddingTask(false);
+                  setEditingTaskId(null);
+                  setTaskForm({ description: '', status: 'pendiente', date: '' });
+                } else {
+                  setIsAddingTask(true);
+                }
+              }}
+            >
+              {isAddingTask ? 'Cancelar' : 'Nueva'}
+            </button>
+          </div>
+
+          {isAddingTask && (
+            <form onSubmit={handleTaskSubmit} style={{ marginBottom: '1.5rem', background: 'var(--soft-gray)', padding: '15px', borderRadius: '12px' }}>
+              <div style={{ marginBottom: '0.8rem' }}>
+                <textarea 
+                  required
+                  placeholder="Descripción de la tarea..."
+                  style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.9rem' }}
+                  value={taskForm.description}
+                  onChange={e => setTaskForm({...taskForm, description: e.target.value})}
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '0.8rem' }}>
+                <input 
+                  type="date"
+                  style={{ padding: '8px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.8rem' }}
+                  value={taskForm.date}
+                  onChange={e => setTaskForm({...taskForm, date: e.target.value})}
+                />
+                <select 
+                  style={{ padding: '8px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.8rem', background: 'white' }}
+                  value={taskForm.status}
+                  onChange={e => setTaskForm({...taskForm, status: e.target.value})}
+                >
+                  <option value="pendiente">Pendiente</option>
+                  <option value="en_ejecucion">En Ejecución</option>
+                  <option value="completa">Completa</option>
+                </select>
+              </div>
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                style={{ width: '100%', padding: '8px', fontSize: '0.9rem', opacity: isSavingTask ? 0.7 : 1 }}
+                disabled={isSavingTask}
+              >
+                {isSavingTask ? 'Guardando...' : 'Guardar Tarea'}
+              </button>
+            </form>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', maxHeight: '400px', overflowY: 'auto' }}>
+            {tasks.length > 0 ? tasks.map(task => (
+              <div key={task.id} style={{ 
+                padding: '12px', 
+                borderRadius: '10px', 
+                border: '1px solid #eee', 
+                background: task.status === 'completa' ? '#f3faf7' : '#fff',
+                position: 'relative'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ 
+                    fontSize: '0.7rem', 
+                    fontWeight: 'bold', 
+                    textTransform: 'uppercase', 
+                    color: getStatusColor(task.status)
+                  }}>
+                    {task.status.replace('_', ' ')}
+                  </span>
+                  {task.date && (
+                    <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>
+                      {formatDate(task.date)}
+                    </span>
+                  )}
+                </div>
+                <p 
+                  onClick={() => handleEditTask(task)}
+                  style={{ 
+                    fontSize: '0.9rem', 
+                    textDecoration: task.status === 'completa' ? 'line-through' : 'none',
+                    opacity: task.status === 'completa' ? 0.6 : 1,
+                    cursor: 'pointer',
+                    transition: 'color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.color = 'var(--primary)'}
+                  onMouseLeave={(e) => e.target.style.color = 'inherit'}
+                >
+                  {task.description}
+                </p>
+                <div style={{ display: 'flex', gap: '15px', marginTop: '10px', alignItems: 'center' }}>
+                  <button 
+                    onClick={() => handleToggleTaskStatus(task)}
+                    style={{ 
+                      background: 'transparent', 
+                      border: 'none', 
+                      color: 'var(--primary)', 
+                      fontSize: '0.75rem', 
+                      cursor: 'pointer',
+                      padding: 0
+                    }}
+                  >
+                    {task.status === 'completa' ? 'Reabrir' : 'Siguiente estado'}
+                  </button>
+                  <div style={{ flex: 1 }}></div>
+                  <button 
+                    onClick={() => handleEditTask(task)}
+                    title="Editar"
+                    style={{ 
+                      background: 'transparent', 
+                      border: 'none', 
+                      color: '#666', 
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      borderRadius: '4px',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                    onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                  >
+                    <Edit3 size={14} />
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteTask(task.id)}
+                    title="Borrar"
+                    style={{ 
+                      background: 'transparent', 
+                      border: 'none', 
+                      color: '#ef4444', 
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      borderRadius: '4px',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.background = '#fdf2f2'}
+                    onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            )) : (
+              <p style={{ fontSize: '0.85rem', opacity: 0.5, textAlign: 'center', padding: '1rem' }}>No hay tareas pendientes.</p>
+            )}
+          </div>
         </div>
       </div>
     </div>

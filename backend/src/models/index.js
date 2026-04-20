@@ -7,10 +7,10 @@ const Appointment = require('./Appointment');
 const ProfessionalBenefits = require('./ProfessionalBenefits');
 const Activity = require('./Activity');
 const PatientDocument = require('./PatientDocument');
+const Task = require('./Task');
 
 // Associations
 
-// Professional <-> Benefit (Many-to-Many)
 // Professional <-> Benefit (Many-to-Many)
 Professional.belongsToMany(Benefit, { 
   through: ProfessionalBenefits, 
@@ -59,5 +59,6 @@ module.exports = {
   Patient,
   Appointment,
   Activity,
-  PatientDocument
+  PatientDocument,
+  Task
 };

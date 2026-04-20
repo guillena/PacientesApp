@@ -14,6 +14,10 @@ const Benefit = sequelize.define('Benefit', {
   description: {
     type: DataTypes.TEXT,
     allowNull: true
+  },
+  isAdmission: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   }
 }, {
   tableName: 'Prestaciones'

@@ -22,6 +22,14 @@ const Appointment = sequelize.define('Appointment', {
   notes: {
     type: DataTypes.TEXT,
     allowNull: true
+  },
+  attended: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  repetitionId: {
+    type: DataTypes.STRING,
+    allowNull: true
   }
 });
 

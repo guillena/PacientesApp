@@ -1,4 +1,5 @@
 const express = require('express');
+// Trigger restart for Tasks routes
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -13,6 +14,7 @@ const patientRoutes = require('./src/routes/patientRoutes');
 const benefitRoutes = require('./src/routes/benefitRoutes');
 const appointmentRoutes = require('./src/routes/appointmentRoutes');
 const activityRoutes = require('./src/routes/activityRoutes');
+const taskRoutes = require('./src/routes/taskRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -37,6 +39,7 @@ app.use('/api/patients', patientRoutes);
 app.use('/api/benefits', benefitRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/activities', activityRoutes);
+app.use('/api/tasks', taskRoutes);
 
 // Basic Route
 app.get('/health', (req, res) => {

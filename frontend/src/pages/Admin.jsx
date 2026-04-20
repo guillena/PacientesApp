@@ -18,7 +18,7 @@ const Admin = () => {
   const [benefits, setBenefits] = useState([]);
   const [showServModal, setShowServModal] = useState(false);
   const [editingServId, setEditingServId] = useState(null);
-  const [servForm, setServForm] = useState({ name: '', description: '' });
+  const [servForm, setServForm] = useState({ name: '', description: '', isAdmission: false });
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
   const [showPassword, setShowPassword] = useState(false);
   
@@ -187,7 +187,7 @@ const Admin = () => {
       setServForm({ ...serv });
     } else {
       setEditingServId(null);
-      setServForm({ name: '', description: '' });
+      setServForm({ name: '', description: '', isAdmission: false });
     }
     setShowServModal(true);
   };
@@ -393,6 +393,7 @@ const Admin = () => {
                 <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--soft-gray)' }}>
                   {[
                     { label: 'Prestación', key: 'name' },
+                    { label: 'Admisión', key: 'isAdmission' },
                     { label: 'Descripción', key: 'description' }
                   ].map(header => (
                     <th 
@@ -415,6 +416,15 @@ const Admin = () => {
                 {sortedBenefits.map(s => (
                   <tr key={s.id} style={{ borderBottom: '1px solid var(--soft-gray)' }}>
                     <td style={{ padding: '1rem', fontWeight: 'bold' }}>{s.name}</td>
+                    <td style={{ padding: '1rem' }}>
+                      {s.isAdmission ? (
+                        <span style={{ background: '#f5f5f5', color: '#666', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', border: '1px solid #ddd' }}>
+                          Sí
+                        </span>
+                      ) : (
+                        <span style={{ color: '#ccc', fontSize: '0.75rem' }}>No</span>
+                      )}
+                    </td>
                     <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#666' }}>{s.description}</td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', gap: '8px' }}>
@@ -607,6 +617,15 @@ const Admin = () => {
               <div style={{ marginBottom: '1.5rem' }}>
                 <label>Descripción</label>
                 <textarea className="form-control" style={{ width: '100%', padding: '8px', borderRadius:'8px', border:'1px solid #ddd'}} value={servForm.description} onChange={e => setServForm({...servForm, description: e.target.value})} />
+              </div>
+              <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input 
+                  type="checkbox" 
+                  id="isAdmission"
+                  checked={servForm.isAdmission} 
+                  onChange={e => setServForm({...servForm, isAdmission: e.target.checked})} 
+                />
+                <label htmlFor="isAdmission" style={{ cursor: 'pointer', fontSize: '0.9rem' }}>¿Es una prestación de Admisión? (Prospectos)</label>
               </div>
               <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Guardar</button>
             </form>

@@ -3,8 +3,10 @@ const { Op } = require('sequelize');
 
 const createAppointment = async (req, res) => {
   try {
-    const { patientId, benefitId, startTime, endTime, notes } = req.body;
+    const { patientId, benefitId, startTime, endTime, notes, attended, repetitionId } = req.body;
     let professionalId = req.professional.id; // Default to self
+
+    console.log('CREATING APPOINTMENT:', req.body);
 
     // If admin, allow passing professionalId, if none passed, it remains admin's own ID
     if (req.professional.role === 'admin' && req.body.professionalId) {
@@ -17,12 +19,15 @@ const createAppointment = async (req, res) => {
       benefitId,
       startTime,
       endTime,
-      notes
+      notes,
+      attended,
+      repetitionId
     });
 
     res.status(201).send(appointment);
   } catch (e) {
-    res.status(400).send(e);
+    console.error('APPOINTMENT CREATE ERROR:', e);
+    res.status(400).send({ error: e.message || 'Error creating appointment' });
   }
 };
 
@@ -50,7 +55,7 @@ const getAppointments = async (req, res) => {
       include: [
         { model: Patient },
         { model: Professional, attributes: ['firstName', 'lastName', 'role', 'color'] },
-        { model: Benefit, attributes: ['name'] }
+        { model: Benefit, attributes: ['name', 'isAdmission'] }
       ]
     });
 
@@ -73,7 +78,8 @@ const updateAppointment = async (req, res) => {
     await appointment.update(req.body);
     res.send(appointment);
   } catch (e) {
-    res.status(400).send(e);
+    console.error('APPOINTMENT UPDATE ERROR:', e);
+    res.status(400).send({ error: e.message || 'Error updating appointment' });
   }
 };
 

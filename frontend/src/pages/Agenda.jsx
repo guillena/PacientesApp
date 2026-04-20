@@ -5,7 +5,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import api from '../api';
 import { useAuth } from '../store/AuthContext';
-import { X, Trash2 } from 'lucide-react';
+import { X, Trash2, CheckCircle2 } from 'lucide-react';
 import MessageModal from '../components/MessageModal';
 
 const Agenda = () => {
@@ -31,7 +31,8 @@ const Agenda = () => {
     startTime: '',
     endTime: '',
     notes: '',
-    repetitions: 1
+    repetitions: 1,
+    attended: false
   });
 
   useEffect(() => {
@@ -59,19 +60,38 @@ const Agenda = () => {
 
   const fetchAppointments = async () => {
     try {
-      const response = await api.get('/appointments');
-      const formattedEvents = response.data.map(app => ({
+      const [appRes, taskRes] = await Promise.all([
+        api.get('/appointments'),
+        api.get('/tasks')
+      ]);
+
+      const appEvents = appRes.data.map(app => ({
         id: app.id,
         title: `${app.Patient?.firstName} ${app.Patient?.lastName} - ${app.Benefit?.name}`,
         start: app.startTime,
         end: app.endTime,
-        backgroundColor: (app.Professional?.role === 'admin' ? '#95a5a6' : app.Professional?.color) || 'var(--salmon)',
+        backgroundColor: (app.Benefit?.isAdmission || app.Professional?.role === 'admin') ? '#95a5a6' : (app.Professional?.color || 'var(--salmon)'),
         borderColor: 'transparent',
-        extendedProps: { ...app }
+        extendedProps: { ...app },
+        display: 'block'
       }));
-      setEvents(formattedEvents);
+
+      const taskEvents = taskRes.data
+        .filter(t => t.date && t.status !== 'completa')
+        .map(t => ({
+          id: `task-${t.id}`,
+          title: `📝 Tarea: ${t.description}`,
+          start: t.date,
+          allDay: true,
+          backgroundColor: '#95a5a6',
+          borderColor: 'transparent',
+          extendedProps: { ...t, isTask: true },
+          display: 'block'
+        }));
+
+      setEvents([...appEvents, ...taskEvents]);
     } catch (err) {
-      console.error('Error fetching appointments', err);
+      console.error('Error fetching data', err);
     }
   };
 
@@ -92,12 +112,14 @@ const Agenda = () => {
       startTime: startDate.toTimeString().substring(0, 5),
       endTime: endDate.toTimeString().substring(0, 5),
       notes: '',
-      repetitions: 1
+      repetitions: 1,
+      attended: false
     });
     setShowModal(true);
   };
 
   const handleEventClick = (info) => {
+    if (info.event.extendedProps.isTask) return;
     const app = info.event.extendedProps;
     
     // Convert UTC Date to local HTML format for inputs
@@ -114,7 +136,8 @@ const Agenda = () => {
       startTime: sDate.toTimeString().substring(0, 5),
       endTime: eDate.toTimeString().substring(0, 5),
       notes: app.notes || '',
-      repetitions: 1
+      repetitions: 1,
+      attended: !!app.attended
     });
     setShowModal(true);
   };
@@ -122,8 +145,22 @@ const Agenda = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const reps = editingId ? 1 : parseInt(formData.repetitions, 10) || 1;
+      if (!formData.patientId || !formData.benefitId || !formData.date || !formData.startTime || !formData.endTime) {
+        alert('Por favor, selecciona paciente, prestación, fecha y horarios.');
+        return;
+      }
+      const reps = parseInt(formData.repetitions, 10) || 1;
       const promises = [];
+      
+      let repId = null;
+      if (reps > 1) {
+        const currentEvent = editingId ? events.find(e => e.id === editingId) : null;
+        repId = currentEvent?.extendedProps?.repetitionId || (window.crypto ? window.crypto.randomUUID() : Math.random().toString(36).substring(2, 11));
+      } else if (editingId) {
+        // Keep existing repId if editing without adding more
+        const currentEvent = events.find(e => e.id === editingId);
+        repId = currentEvent?.extendedProps?.repetitionId;
+      }
 
       for (let i = 0; i < reps; i++) {
         const currentStartDate = new Date(`${formData.date}T${formData.startTime}:00`);
@@ -132,16 +169,35 @@ const Agenda = () => {
         currentStartDate.setDate(currentStartDate.getDate() + (i * 7));
         currentEndDate.setDate(currentEndDate.getDate() + (i * 7));
 
+        const startTimeISO = currentStartDate.toISOString();
+        const endTimeISO = currentEndDate.toISOString();
+
+        // Check if a session already exists for this patient, professional, and time
+        const isDuplicate = events.some(ev => {
+          const app = ev.extendedProps;
+          if (app.isTask) return false;
+          return ev.id !== editingId && 
+                 app.patientId?.toString() === formData.patientId?.toString() &&
+                 app.startTime === startTimeISO;
+        });
+
+        if (isDuplicate) {
+          console.log(`Skipping duplicate session for ${startTimeISO}`);
+          continue;
+        }
+
         const payload = {
           patientId: formData.patientId,
           benefitId: formData.benefitId,
           professionalId: user.role === 'admin' ? formData.professionalId : user.id,
-          startTime: currentStartDate.toISOString(),
-          endTime: currentEndDate.toISOString(),
-          notes: formData.notes
+          startTime: startTimeISO,
+          endTime: endTimeISO,
+          notes: formData.notes,
+          attended: formData.attended,
+          repetitionId: repId
         };
 
-        if (editingId) {
+        if (editingId && i === 0) {
           promises.push(api.patch(`/appointments/${editingId}`, payload));
         } else {
           promises.push(api.post('/appointments', payload));
@@ -153,7 +209,9 @@ const Agenda = () => {
       setShowModal(false);
       fetchAppointments();
     } catch (err) {
-      alert('Error al guardar el turno. Verifica que tengas los permisos necesarios.');
+      console.error('Submit error:', err);
+      const errorMsg = err.response?.data?.error || err.message || 'Error al guardar el turno.';
+      alert(`Error: ${errorMsg}. Verifica que tengas los permisos necesarios.`);
     }
   };
 
@@ -175,12 +233,19 @@ const Agenda = () => {
             const app = e.extendedProps;
             const appDate = new Date(app.startTime);
             
+            // If they have the same repetitionId, use that
+            if (currentApp.repetitionId && app.repetitionId === currentApp.repetitionId) {
+              return appDate >= currentStartDate && !app.attended;
+            }
+            
+            // Legacy fallback (fuzzy match)
             return app.patientId === currentApp.patientId &&
                    app.benefitId === currentApp.benefitId &&
                    app.professionalId === currentApp.professionalId &&
                    appDate >= currentStartDate &&
                    appDate.getDay() === dayOfWeek &&
-                   appDate.toTimeString().substring(0, 5) === timeString;
+                   appDate.toTimeString().substring(0, 5) === timeString &&
+                   !app.attended;
           });
           
           const promises = appsToDelete.map(app => api.delete(`/appointments/${app.id}`));
@@ -198,7 +263,7 @@ const Agenda = () => {
 
   const displayEvents = filterProfessional === 'all' 
     ? events 
-    : events.filter(e => e.extendedProps.professionalId?.toString() === filterProfessional.toString());
+    : events.filter(e => e.extendedProps.isTask || e.extendedProps.professionalId?.toString() === filterProfessional.toString());
 
   return (
     <div>
@@ -243,13 +308,33 @@ const Agenda = () => {
           eventClick={handleEventClick}
           slotMinTime="08:00:00"
           slotMaxTime="20:00:00"
-          allDaySlot={false}
+          allDaySlot={true}
           slotEventOverlap={false}
           locale="es"
           buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', workWeek: 'Laboral', day: 'Día' }}
           eventBackgroundColor="var(--salmon)"
           eventBorderColor="transparent"
           height="700px"
+          eventContent={(eventInfo) => {
+            const isAttended = eventInfo.event.extendedProps.attended;
+            return (
+              <div style={{ 
+                padding: '2px 4px', 
+                overflow: 'hidden', 
+                textOverflow: 'ellipsis', 
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                width: '100%'
+              }}>
+                {isAttended && <CheckCircle2 size={14} style={{ flexShrink: 0 }} />}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {eventInfo.event.title}
+                </span>
+              </div>
+            );
+          }}
         />
       </div>
 
@@ -312,7 +397,7 @@ const Agenda = () => {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: editingId ? '1fr 1fr 1fr' : '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>Fecha</label>
                   <input 
@@ -343,23 +428,45 @@ const Agenda = () => {
                     style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
                   />
                 </div>
-                {!editingId && (
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>Repetir</label>
-                    <select 
-                      value={formData.repetitions}
-                      onChange={e => setFormData({...formData, repetitions: e.target.value})}
-                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: 'white' }}
-                    >
-                      {[...Array(10)].map((_, i) => (
-                        <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'vez' : 'sesiones'}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
               </div>
 
-              <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem', marginBottom: '1rem', alignItems: 'end' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>Repetir sesiones</label>
+                  <select 
+                    value={formData.repetitions}
+                    onChange={e => setFormData({...formData, repetitions: e.target.value})}
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: 'white' }}
+                  >
+                    {[...Array(10)].map((_, i) => (
+                      <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'vez' : 'sesiones semanales'}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ 
+                  padding: '8px 12px', 
+                  borderRadius: '8px', 
+                  backgroundColor: '#f0f9ff', 
+                  border: '1px solid #bae6fd', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.8rem',
+                  height: '42px'
+                }}>
+                  <input 
+                    type="checkbox" 
+                    id="attended"
+                    checked={formData.attended}
+                    onChange={(e) => setFormData({...formData, attended: e.target.checked})}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer', margin: 0 }}
+                  />
+                  <label htmlFor="attended" style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#0369a1', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}>
+                    <CheckCircle2 size={16} /> ¿Vino?
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>Notas</label>
                 <textarea 
                   value={formData.notes} 
@@ -378,7 +485,7 @@ const Agenda = () => {
                     style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                   />
                   <label htmlFor="deleteFuture" style={{ fontSize: '0.9rem', color: '#666', cursor: 'pointer' }}>
-                    Al eliminar, borrar también los turnos futuros repetidos
+                    Al eliminar, borrar también las sesiones repetidas futuras
                   </label>
                 </div>
               )}
@@ -400,8 +507,8 @@ const Agenda = () => {
         isOpen={confirmDeleteModal}
         type="info"
         message={deleteFuture 
-          ? '¿Estás seguro de que deseas eliminar este turno y todos los siguientes repetidos?' 
-          : '¿Estás seguro de que deseas eliminar este turno?'}
+          ? '¿Estás seguro de que deseas eliminar esta sesión y todas las sesiones repetidas futuras?' 
+          : '¿Estás seguro de que deseas eliminar esta sesión?'}
         onClose={executeDelete}
         onCancel={() => setConfirmDeleteModal(false)}
       />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { Search, UserPlus, Edit3, X, ArrowUpDown, ArrowUp, ArrowDown, Activity, List, Grid, Eye, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCw, FileText, Trash2, Calendar } from 'lucide-react';
+import { Search, UserPlus, Edit3, X, ArrowUpDown, ArrowUp, ArrowDown, Activity, List, Grid, Eye, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCw, FileText, Trash2, Calendar, CheckCircle2, MoreVertical } from 'lucide-react';
 import MessageModal from '../components/MessageModal';
 import { useAuth } from '../store/AuthContext';
 
@@ -109,6 +109,14 @@ const Patients = () => {
 
   // State for Global Messages
   const [msgModal, setMsgModal] = useState({ isOpen: false, message: '', type: 'info', onConfirm: null });
+
+  const [activeDropdown, setActiveDropdown] = useState(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setActiveDropdown(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
 
   const showMsg = (message, type = 'info', onConfirm = null) => {
     setMsgModal({ isOpen: true, message, type, onConfirm });
@@ -725,24 +733,45 @@ const Patients = () => {
                   )}
                 </td>
                 <td style={{ padding: '1rem' }}>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => openViewModal(p)} title="Ver Detalles">
                       <Eye size={18} color="#4a90e2" />
                     </button>
                     <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => handleEdit(p)} title="Editar Paciente">
                       <Edit3 size={18} color="#4a90e2" />
                     </button>
-                    {isAdmin && (
-                      <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => handleDeletePatient(p.id)} title="Borrar Paciente">
-                        <Trash2 size={18} color="#ef4444" />
+                    
+                    <div style={{ position: 'relative' }}>
+                      <button 
+                        className="btn" 
+                        style={{ padding: '6px', background: 'transparent' }} 
+                        onClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown === p.id ? null : p.id); }}
+                      >
+                        <MoreVertical size={18} color="#666" />
                       </button>
-                    )}
-                    <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => openSessions(p)} title="Ver Sesiones">
-                      <Calendar size={18} color="var(--primary)" />
-                    </button>
-                    <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => openActivities(p)} title="Actividades">
-                      <Activity size={18} color="var(--light-blue)" />
-                    </button>
+                      
+                      {activeDropdown === p.id && (
+                        <div style={{
+                          position: 'absolute', right: 0, top: '100%', backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10, minWidth: '160px', padding: '8px 0'
+                        }}>
+                          <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', transition: 'background 0.2s' }} onClick={() => openSessions(p)}>
+                            <Calendar size={16} color="var(--primary)" /> <span style={{ fontSize: '0.9rem' }}>Sesiones</span>
+                          </button>
+                          <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', transition: 'background 0.2s' }} onClick={() => openActivities(p)}>
+                            <Activity size={16} color="var(--light-blue)" /> <span style={{ fontSize: '0.9rem' }}>Historia Clínica</span>
+                          </button>
+                          {isAdmin && (
+                            <>
+                              <div style={{ borderTop: '1px solid #eee', margin: '4px 0' }}></div>
+                              <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', color: '#ef4444' }} onClick={() => handleDeletePatient(p.id)}>
+                                <Trash2 size={16} /> <span style={{ fontSize: '0.9rem' }}>Borrar</span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </td>
               </tr>
@@ -786,19 +815,45 @@ const Patients = () => {
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid #eee', paddingTop: '1rem', marginTop: 'auto' }}>
+              <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid #eee', paddingTop: '1rem', marginTop: 'auto', alignItems: 'center' }}>
                 <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555' }} onClick={() => openViewModal(p)}>
                   <Eye size={16} color="#4a90e2" /> Ver
                 </button>
                 <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555' }} onClick={() => handleEdit(p)}>
                   <Edit3 size={16} color="#4a90e2" /> Editar
                 </button>
-                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555' }} onClick={() => openSessions(p)}>
-                  <Calendar size={16} color="var(--primary)" /> Sesiones
-                </button>
-                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555' }} onClick={() => openActivities(p)}>
-                  <Activity size={16} color="var(--light-blue)" /> Historial
-                </button>
+                
+                <div style={{ position: 'relative' }}>
+                  <button 
+                    className="btn" 
+                    style={{ padding: '8px', border: '1px solid #eee', background: '#fcfcfc' }}
+                    onClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown === p.id ? null : p.id); }}
+                  >
+                    <MoreVertical size={16} color="#666" />
+                  </button>
+                  
+                  {activeDropdown === p.id && (
+                    <div style={{
+                      position: 'absolute', right: 0, bottom: '100%', backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '8px',
+                      boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', zIndex: 10, minWidth: '160px', padding: '8px 0', marginBottom: '8px'
+                    }}>
+                      <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => openSessions(p)}>
+                        <Calendar size={16} color="var(--primary)" /> <span style={{ fontSize: '0.9rem' }}>Sesiones</span>
+                      </button>
+                      <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => openActivities(p)}>
+                        <Activity size={16} color="var(--light-blue)" /> <span style={{ fontSize: '0.9rem' }}>Historia Clínica</span>
+                      </button>
+                      {isAdmin && (
+                        <>
+                          <div style={{ borderTop: '1px solid #eee', margin: '4px 0' }}></div>
+                          <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', color: '#ef4444' }} onClick={() => handleDeletePatient(p.id)}>
+                            <Trash2 size={16} /> <span style={{ fontSize: '0.9rem' }}>Borrar</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )) : (
@@ -822,7 +877,7 @@ const Patients = () => {
             >
               <X size={24} />
             </button>
-            <h2 style={{ marginBottom: '1.5rem', paddingRight: '30px' }}>Actividades - {selectedPatient.lastName}, {selectedPatient.firstName}</h2>
+            <h2 style={{ marginBottom: '1.5rem', paddingRight: '30px' }}>Historia Clínica - {selectedPatient.lastName}, {selectedPatient.firstName}</h2>
             
             {/* Activities List */}
             <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1.5rem', paddingRight: '10px' }}>
@@ -839,20 +894,20 @@ const Patients = () => {
               )}
             </div>
 
-            {/* Add Activity Form */}
+              {/* Add Activity Form */}
             <form onSubmit={handleAddActivity} style={{ borderTop: '2px solid var(--soft-gray)', paddingTop: '1.5rem' }}>
               <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '8px', fontWeight: 'bold' }}>Nueva Actividad</label>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '8px', fontWeight: 'bold' }}>Nueva Historia Clínica</label>
                 <textarea 
                   required
                   rows="3"
-                  placeholder="Ej: Se atendió el día de hoy, evolución favorable..."
+                  placeholder="Ej: Evolución favorable, se observa mejoría en..."
                   style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ccc', resize: 'vertical' }}
                   value={newActivityDesc}
                   onChange={e => setNewActivityDesc(e.target.value)}
                 />
               </div>
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', color: 'var(--dark-text)' }}>Agregar Actividad</button>
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', color: 'var(--dark-text)' }}>Agregar a Historia Clínica</button>
             </form>
           </div>
         </div>
@@ -1102,6 +1157,7 @@ const Patients = () => {
                       <th style={{ padding: '12px' }}>Hora</th>
                       <th style={{ padding: '12px' }}>Profesional</th>
                       <th style={{ padding: '12px' }}>Prestación</th>
+                      <th style={{ padding: '12px', textAlign: 'center' }}>Vino</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1123,8 +1179,15 @@ const Patients = () => {
                           <td style={{ padding: '12px', color: isExpired ? '#999' : '#333' }}>
                             {session.Professional?.firstName} {session.Professional?.lastName}
                           </td>
-                          <td style={{ padding: '12px', color: isExpired ? '#999' : '#333' }}>
+                           <td style={{ padding: '12px', color: isExpired ? '#999' : '#333' }}>
                             {session.Benefit?.name}
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            {session.attended ? (
+                              <CheckCircle2 size={18} color="#059669" style={{ margin: 'auto' }} />
+                            ) : (
+                              <span style={{ opacity: 0.3 }}>-</span>
+                            )}
                           </td>
                         </tr>
                       );
