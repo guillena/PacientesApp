@@ -52,9 +52,12 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).send({ error: err.message, details: err });
 });
 
+const { initBirthdayCron } = require('./src/utils/birthdayCron');
+
 // Database Sync and Start Server
 sequelize.sync().then(() => {
   console.log('Database connected and synced');
+  initBirthdayCron();
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });

@@ -35,10 +35,15 @@ const Agenda = () => {
     attended: false
   });
 
+  const [birthdayEvents, setBirthdayEvents] = useState([]);
+
   useEffect(() => {
-    fetchAppointments();
     fetchDependencies();
   }, [user.id]);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [birthdayEvents]);
 
   const fetchDependencies = async () => {
     try {
@@ -53,6 +58,72 @@ const Agenda = () => {
         const profs = await api.get('/professionals');
         setProfessionals(profs.data);
       }
+
+      const formatDate = (d) => d.toISOString().split('T')[0];
+      const currentYear = new Date().getFullYear();
+
+      const bdays = [];
+      pts.data.forEach(p => {
+        if (!p.birthDate || p.isInactive) return;
+        const datePart = p.birthDate.split('T')[0];
+        const [, month, day] = datePart.split('-');
+
+        [currentYear, currentYear + 1].forEach(year => {
+          // Use noon to avoid DST issues shifting the day
+          const bdDate = new Date(`${year}-${month}-${day}T12:00:00`);
+          const dow = bdDate.getDay(); // 0=Dom, 6=Sáb
+
+          // Always push the actual birthday day (visible in month view)
+          bdays.push({
+            id: `bday-${p.id}-${year}`,
+            title: `🎂 ${p.firstName} ${p.lastName}`,
+            start: `${year}-${month}-${day}`,
+            allDay: true,
+            backgroundColor: '#f59e0b',
+            borderColor: 'transparent',
+            textColor: '#fff',
+            extendedProps: { isBirthday: true, patient: p },
+            display: 'block'
+          });
+
+          if (dow === 6 || dow === 0) {
+            // Saturday (6) or Sunday (0)
+            const dayLabel = dow === 6 ? 'sáb.' : 'dom.';
+
+            // Friday before: arrow → (birthday coming this weekend)
+            const friday = new Date(bdDate);
+            friday.setDate(friday.getDate() - (dow === 6 ? 1 : 2));
+            bdays.push({
+              id: `bday-${p.id}-${year}-fri`,
+              title: `🎂→ ${p.firstName} ${p.lastName} (${dayLabel})`,
+              start: formatDate(friday),
+              allDay: true,
+              backgroundColor: '#f59e0b',
+              borderColor: 'transparent',
+              textColor: '#fff',
+              extendedProps: { isBirthday: true, patient: p },
+              display: 'block'
+            });
+
+            // Monday after: arrow ← (birthday was last weekend)
+            const monday = new Date(bdDate);
+            monday.setDate(monday.getDate() + (dow === 6 ? 2 : 1));
+            bdays.push({
+              id: `bday-${p.id}-${year}-mon`,
+              title: `←🎂 ${p.firstName} ${p.lastName} (${dayLabel})`,
+              start: formatDate(monday),
+              allDay: true,
+              backgroundColor: '#d97706',
+              borderColor: 'transparent',
+              textColor: '#fff',
+              extendedProps: { isBirthday: true, patient: p },
+              display: 'block'
+            });
+          }
+        });
+      });
+      setBirthdayEvents(bdays);
+
     } catch (err) {
       console.error('Error fetching dependencies', err);
     }
@@ -89,7 +160,7 @@ const Agenda = () => {
           display: 'block'
         }));
 
-      setEvents([...appEvents, ...taskEvents]);
+      setEvents([...appEvents, ...taskEvents, ...birthdayEvents]);
     } catch (err) {
       console.error('Error fetching data', err);
     }
@@ -120,6 +191,7 @@ const Agenda = () => {
 
   const handleEventClick = (info) => {
     if (info.event.extendedProps.isTask) return;
+    if (info.event.extendedProps.isBirthday) return;
     const app = info.event.extendedProps;
     
     // Convert UTC Date to local HTML format for inputs
@@ -263,7 +335,7 @@ const Agenda = () => {
 
   const displayEvents = filterProfessional === 'all' 
     ? events 
-    : events.filter(e => e.extendedProps.isTask || e.extendedProps.professionalId?.toString() === filterProfessional.toString());
+    : events.filter(e => e.extendedProps.isTask || e.extendedProps.isBirthday || e.extendedProps.professionalId?.toString() === filterProfessional.toString());
 
   return (
     <div>

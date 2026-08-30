@@ -186,7 +186,7 @@ const Patients = () => {
       docNumber: patient.docNumber,
       email: patient.email || '',
       phone: patient.phone || '',
-      birthDate: patient.birthDate || '',
+      birthDate: patient.birthDate ? patient.birthDate.split('T')[0] : '',
       street: patient.street || '',
       number: patient.number || '',
       floor: patient.floor || '',

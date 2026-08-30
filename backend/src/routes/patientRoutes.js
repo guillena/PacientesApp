@@ -2,7 +2,7 @@ const express = require('express');
 const { 
   createPatient, getPatients, getPatient, updatePatient, 
   getDocumentTypes, uploadPatientDocument, deletePatientDocument, 
-  deletePatient, getPatientDocument 
+  deletePatient, getPatientDocument, triggerBirthdayEmail 
 } = require('../controllers/patientController');
 const { auth, isAdmin } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -11,6 +11,7 @@ const router = express.Router();
 router.post('/', auth, createPatient);
 router.get('/', auth, getPatients);
 router.get('/document-types', auth, getDocumentTypes);
+router.post('/send-birthday-email', auth, triggerBirthdayEmail);
 router.get('/:id', auth, getPatient);
 router.patch('/:id', auth, updatePatient);
 router.delete('/:id', auth, isAdmin, deletePatient);

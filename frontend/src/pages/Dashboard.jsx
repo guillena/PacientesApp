@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../store/AuthContext';
-import { Calendar as CalendarIcon, Users, Clock, ArrowRight, CheckCircle2, Edit3, Trash2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Users, ArrowRight, CheckCircle2, Edit3, Trash2, Mail } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [sendingMail, setSendingMail] = useState(false);
 
   const [stats, setStats] = useState({
     todayCount: 0,
@@ -19,6 +20,7 @@ const Dashboard = () => {
   const [taskForm, setTaskForm] = useState({ description: '', status: 'pendiente', date: '' });
   const [isSavingTask, setIsSavingTask] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [upcomingBirthdays, setUpcomingBirthdays] = useState([]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -61,6 +63,73 @@ const Dashboard = () => {
           totalPatients: patients.filter(p => !p.isInactive).length,
           nextAppointments: upcoming.slice(0, 3)
         });
+
+        // Compute birthdays
+        const currentYear = now.getFullYear();
+        const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const todayDayOfWeek = todayDate.getDay();
+
+        const birthdays = [];
+        patients.forEach(p => {
+          if (!p.birthDate || p.isInactive) return;
+          const datePart = p.birthDate.split('T')[0];
+          const [birthYearStr, monthStr, dayStr] = datePart.split('-');
+          const birthYear = parseInt(birthYearStr, 10);
+          const month = parseInt(monthStr, 10);
+          const day = parseInt(dayStr, 10);
+
+          for (const year of [currentYear - 1, currentYear, currentYear + 1]) {
+            const bdDate = new Date(year, month - 1, day);
+            const bdDayOfWeek = bdDate.getDay();
+            const diffDays = Math.round((bdDate - todayDate) / (1000 * 60 * 60 * 24));
+            const age = year - birthYear;
+
+            if (diffDays === 0) {
+              birthdays.push({ patient: p, date: bdDate, age, isToday: true, displayLabel: 'Hoy 🎉' });
+              break;
+            }
+
+            if (diffDays < 0) {
+              if (todayDayOfWeek === 1 && (diffDays === -1 || diffDays === -2) && (bdDayOfWeek === 0 || bdDayOfWeek === 6)) {
+                const dayTag = bdDayOfWeek === 6 ? 'sáb.' : 'dom.';
+                const dateStr = bdDate.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+                birthdays.push({ patient: p, date: bdDate, age, isToday: false, displayLabel: `← ${dayTag} ${dateStr}` });
+                break;
+              }
+              if (todayDayOfWeek === 0 && diffDays === -1 && bdDayOfWeek === 6) {
+                const dateStr = bdDate.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+                birthdays.push({ patient: p, date: bdDate, age, isToday: false, displayLabel: `← sáb. ${dateStr}` });
+                break;
+              }
+            }
+
+            if (diffDays > 0 && diffDays <= 7) {
+              const dateStr = bdDate.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+
+              if (todayDayOfWeek === 5 && (bdDayOfWeek === 6 || bdDayOfWeek === 0)) {
+                const dayTag = bdDayOfWeek === 6 ? 'sáb.' : 'dom.';
+                birthdays.push({ patient: p, date: bdDate, age, isToday: false, displayLabel: `→ ${dayTag} ${dateStr}` });
+                break;
+              }
+              if (todayDayOfWeek === 6 && bdDayOfWeek === 0) {
+                birthdays.push({ patient: p, date: bdDate, age, isToday: false, displayLabel: `→ dom. ${dateStr}` });
+                break;
+              }
+
+              if (diffDays === 1) {
+                birthdays.push({ patient: p, date: bdDate, age, isToday: false, displayLabel: 'Mañana' });
+              } else {
+                const dayName = bdDate.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' });
+                birthdays.push({ patient: p, date: bdDate, age, isToday: false, displayLabel: dayName });
+              }
+              break;
+            }
+          }
+        });
+
+        birthdays.sort((a, b) => a.date - b.date);
+        setUpcomingBirthdays(birthdays);
+
         setLoading(false);
 
       } catch (err) {
@@ -118,6 +187,24 @@ const Dashboard = () => {
       date: task.date || ''
     });
     setIsAddingTask(true);
+  };
+
+  const handleSendBirthdayEmail = async () => {
+    setSendingMail(true);
+    try {
+      const res = await api.post('/patients/send-birthday-email');
+      if (res.data.sent) {
+        alert(`¡Correo enviado con éxito! Se notificaron los cumpleaños.`);
+      } else {
+        alert(res.data.message || 'No hay cumpleaños para notificar hoy.');
+      }
+    } catch (err) {
+      console.error('Error enviando mail', err);
+      const msg = err.response?.data?.error || err.message || 'Error al enviar mail. Revisa la configuración de SMTP en .env';
+      alert(`Error al enviar mail: ${msg}`);
+    } finally {
+      setSendingMail(false);
+    }
   };
 
   const handleDeleteTask = async (id) => {
@@ -219,21 +306,21 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="card" style={{ borderLeft: '6px solid var(--turquoise)' }}>
+        <div className="card" style={{ borderLeft: '6px solid #f59e0b' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <p style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '4px' }}>Horas esta semana</p>
-              <h3 style={{ fontSize: '2rem' }}>--</h3>
+              <p style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '4px' }}>Cumpleaños (próx. 7 días)</p>
+              <h3 style={{ fontSize: '2rem' }}>{upcomingBirthdays.length}</h3>
             </div>
-            <div style={{ background: 'var(--soft-gray)', padding: '12px', borderRadius: '12px' }}>
-              <Clock color="var(--turquoise)" />
+            <div style={{ background: 'var(--soft-gray)', padding: '12px', borderRadius: '12px', fontSize: '1.6rem' }}>
+              🎂
             </div>
           </div>
         </div>
       </div>
 
-      {/* Recently Viewed / Next Appointments */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
+      {/* Next Appointments / Birthdays / Tasks */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '2rem' }}>
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
             <h3>Próximos Turnos</h3>
@@ -286,6 +373,65 @@ const Dashboard = () => {
               </div>
             )) : (
               <p style={{ opacity: 0.6, textAlign: 'center', padding: '1rem' }}>No hay próximos turnos.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Birthdays detail panel */}
+        <div className="card" style={{ borderTop: '4px solid #f59e0b', display: 'flex', flexDirection: 'column', height: 'fit-content' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+              🎂 Cumpleaños
+            </h3>
+            <button
+              type="button"
+              className="btn"
+              onClick={handleSendBirthdayEmail}
+              disabled={sendingMail}
+              title="Enviar mail de aviso ahora a natafeli99@hotmail.com"
+              style={{
+                padding: '4px 8px',
+                fontSize: '0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: '#fffbeb',
+                color: '#d97706',
+                border: '1px solid #fde68a',
+                borderRadius: '6px',
+                cursor: 'pointer'
+              }}
+            >
+              <Mail size={14} /> {sendingMail ? 'Enviando...' : 'Notificar'}
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+            {upcomingBirthdays.length > 0 ? upcomingBirthdays.map(({ patient: p, age, isToday, displayLabel }) => {
+              const hasArrow = displayLabel.includes('←') || displayLabel.includes('→');
+              return (
+                <div key={p.id} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '10px 12px', borderRadius: '10px',
+                  background: isToday ? '#fffbeb' : 'var(--soft-gray)',
+                  border: isToday ? '1px solid #f59e0b' : '1px solid transparent'
+                }}>
+                  <div>
+                    <p style={{ fontWeight: '600', fontSize: '0.9rem', margin: 0 }}>{p.firstName} {p.lastName}</p>
+                    <p style={{ fontSize: '0.75rem', opacity: 0.6, margin: 0 }}>Cumple {age} años</p>
+                  </div>
+                  <span style={{
+                    fontSize: '0.8rem',
+                    fontWeight: isToday ? 'bold' : 'normal',
+                    color: isToday ? '#d97706' : (hasArrow ? '#d97706' : '#555')
+                  }}>
+                    {displayLabel}
+                  </span>
+                </div>
+              );
+            }) : (
+              <p style={{ fontSize: '0.85rem', opacity: 0.5, textAlign: 'center', padding: '1rem' }}>
+                Sin cumpleaños en los próximos 7 días.
+              </p>
             )}
           </div>
         </div>

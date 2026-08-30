@@ -2,6 +2,7 @@ const { Patient, DocumentType, PatientDocument, Appointment, Activity } = requir
 const fs = require('fs');
 const path = require('path');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { checkAndSendBirthdayEmails } = require('../utils/birthdayCron');
 
 const createPatient = async (req, res) => {
   try {
@@ -293,6 +294,16 @@ const getPatientDocument = async (req, res) => {
   }
 };
 
+const triggerBirthdayEmail = async (req, res) => {
+  try {
+    const result = await checkAndSendBirthdayEmails();
+    res.send({ success: true, ...result });
+  } catch (e) {
+    console.error('ERROR TRIGGERING BIRTHDAY EMAIL:', e);
+    res.status(500).send({ error: e.message });
+  }
+};
+
 module.exports = {
   createPatient,
   getPatients,
@@ -302,5 +313,6 @@ module.exports = {
   uploadPatientDocument,
   deletePatientDocument,
   deletePatient,
-  getPatientDocument
+  getPatientDocument,
+  triggerBirthdayEmail
 };
