@@ -5,7 +5,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import api from '../api';
 import { useAuth } from '../store/AuthContext';
-import { X, Trash2, CheckCircle2 } from 'lucide-react';
+import { X, Trash2, CheckCircle2, CheckCheck } from 'lucide-react';
 import MessageModal from '../components/MessageModal';
 
 const Agenda = () => {
@@ -32,10 +32,12 @@ const Agenda = () => {
     endTime: '',
     notes: '',
     repetitions: 1,
-    attended: false
+    attended: false,
+    confirmed: false
   });
 
   const [birthdayEvents, setBirthdayEvents] = useState([]);
+  const [hoveredTooltip, setHoveredTooltip] = useState(null);
 
   useEffect(() => {
     fetchDependencies();
@@ -184,7 +186,8 @@ const Agenda = () => {
       endTime: endDate.toTimeString().substring(0, 5),
       notes: '',
       repetitions: 1,
-      attended: false
+      attended: false,
+      confirmed: false
     });
     setShowModal(true);
   };
@@ -209,9 +212,37 @@ const Agenda = () => {
       endTime: eDate.toTimeString().substring(0, 5),
       notes: app.notes || '',
       repetitions: 1,
-      attended: !!app.attended
+      attended: !!app.attended,
+      confirmed: !!app.confirmed
     });
     setShowModal(true);
+  };
+
+  const handleEventMouseEnter = (info) => {
+    const props = info.event.extendedProps;
+    if (props.isTask || props.isBirthday) return;
+
+    const rect = info.el.getBoundingClientRect();
+    const bg = info.event.backgroundColor || 'var(--salmon)';
+
+    const sDate = new Date(props.startTime);
+    const eDate = new Date(props.endTime);
+    const formatTime = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+    setHoveredTooltip({
+      x: rect.left + rect.width / 2,
+      y: rect.top - 10,
+      patientName: props.Patient ? `${props.Patient.firstName} ${props.Patient.lastName}` : 'Paciente',
+      professionalName: props.Professional ? `${props.Professional.firstName} ${props.Professional.lastName}` : 'Profesional',
+      timeStr: `${formatTime(sDate)} - ${formatTime(eDate)} hs`,
+      confirmed: !!props.confirmed,
+      attended: !!props.attended,
+      backgroundColor: bg
+    });
+  };
+
+  const handleEventMouseLeave = () => {
+    setHoveredTooltip(null);
   };
 
   const handleSubmit = async (e) => {
@@ -266,6 +297,7 @@ const Agenda = () => {
           endTime: endTimeISO,
           notes: formData.notes,
           attended: formData.attended,
+          confirmed: formData.confirmed,
           repetitionId: repId
         };
 
@@ -378,6 +410,8 @@ const Agenda = () => {
           events={displayEvents}
           dateClick={handleDateClick}
           eventClick={handleEventClick}
+          eventMouseEnter={handleEventMouseEnter}
+          eventMouseLeave={handleEventMouseLeave}
           slotMinTime="08:00:00"
           slotMaxTime="20:00:00"
           allDaySlot={true}
@@ -389,6 +423,7 @@ const Agenda = () => {
           height="700px"
           eventContent={(eventInfo) => {
             const isAttended = eventInfo.event.extendedProps.attended;
+            const isConfirmed = eventInfo.event.extendedProps.confirmed;
             return (
               <div style={{ 
                 padding: '2px 4px', 
@@ -400,7 +435,8 @@ const Agenda = () => {
                 gap: '4px',
                 width: '100%'
               }}>
-                {isAttended && <CheckCircle2 size={14} style={{ flexShrink: 0 }} />}
+                {isConfirmed && <CheckCheck size={14} style={{ flexShrink: 0, color: '#ffffff' }} title="Turno Confirmado" />}
+                {isAttended && <CheckCircle2 size={14} style={{ flexShrink: 0 }} title="Asistió" />}
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {eventInfo.event.title}
                 </span>
@@ -410,65 +446,135 @@ const Agenda = () => {
         />
       </div>
 
+      {hoveredTooltip && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: hoveredTooltip.y,
+            left: hoveredTooltip.x,
+            transform: 'translate(-50%, -100%)',
+            backgroundColor: hoveredTooltip.backgroundColor,
+            color: '#ffffff',
+            padding: '10px 14px',
+            borderRadius: '10px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            zIndex: 9999,
+            pointerEvents: 'none',
+            fontSize: '0.85rem',
+            minWidth: '220px',
+            border: '1px solid rgba(255,255,255,0.3)'
+          }}
+        >
+          <div style={{ fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.3)', paddingBottom: '4px' }}>
+            👤 {hoveredTooltip.patientName}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div><strong>👨‍⚕️ Profesional:</strong> {hoveredTooltip.professionalName}</div>
+            <div><strong>⏰ Horario:</strong> {hoveredTooltip.timeStr}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+              <strong>¿Confirmó?:</strong>
+              {hoveredTooltip.confirmed ? (
+                <span style={{ backgroundColor: 'rgba(255,255,255,0.25)', padding: '2px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
+                  <CheckCheck size={14} /> Sí
+                </span>
+              ) : (
+                <span style={{ opacity: 0.85 }}>No</span>
+              )}
+            </div>
+          </div>
+          <div style={{
+            position: 'absolute',
+            bottom: '-6px',
+            left: '50%',
+            transform: 'translateX(-50%) rotate(45deg)',
+            width: '12px',
+            height: '12px',
+            backgroundColor: hoveredTooltip.backgroundColor,
+            borderRight: '1px solid rgba(255,255,255,0.3)',
+            borderBottom: '1px solid rgba(255,255,255,0.3)'
+          }} />
+        </div>
+      )}
+
       {showModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
         }}>
-          <div className="card" style={{ width: '100%', maxWidth: '500px', position: 'relative' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', position: 'relative', padding: '1.5rem' }}>
             <button onClick={() => setShowModal(false)} style={{ position: 'absolute', right: '20px', top: '20px', background: 'transparent', border: 'none', cursor: 'pointer' }}>
               <X size={24} />
             </button>
-            <h2 style={{ marginBottom: '1.5rem' }}>{editingId ? 'Editar Turno' : 'Nuevo Turno'}</h2>
+            <h2 style={{ marginBottom: '1.2rem' }}>{editingId ? 'Editar Turno' : 'Nuevo Turno'}</h2>
             
             <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>Paciente</label>
-                <select 
-                  className="form-control" 
-                  value={formData.patientId} 
-                  onChange={e => setFormData({...formData, patientId: e.target.value})} 
-                  required
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: 'white' }}
-                >
-                  <option value="" disabled>Seleccione un paciente</option>
-                  {patients
-                    .filter(p => !p.isInactive || p.id === formData.patientId)
-                    .map(p => <option key={p.id} value={p.id}>{p.lastName}, {p.firstName}</option>)
-                  }
-                </select>
-              </div>
-
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>Prestación</label>
-                <select 
-                  className="form-control" 
-                  value={formData.benefitId} 
-                  onChange={e => setFormData({...formData, benefitId: e.target.value})} 
-                  required
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: 'white' }}
-                >
-                  <option value="" disabled>Seleccione una prestación</option>
-                  {benefits.map(s => <option key={s.id} value={s.id}>{s.name} ({s.duration} min)</option>)}
-                </select>
-              </div>
-
-              {user.role === 'admin' && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>Profesional Asignado</label>
+              {/* Row 1: Paciente & Prestación */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>Paciente</label>
                   <select 
                     className="form-control" 
-                    value={formData.professionalId} 
-                    onChange={e => setFormData({...formData, professionalId: e.target.value})} 
+                    value={formData.patientId} 
+                    onChange={e => setFormData({...formData, patientId: e.target.value})} 
                     required
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: 'white' }}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: 'white' }}
                   >
-                    <option value="" disabled>Seleccione profesional</option>
-                    {professionals.map(p => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}
+                    <option value="" disabled>Seleccione un paciente</option>
+                    {patients
+                      .filter(p => !p.isInactive || p.id === formData.patientId)
+                      .map(p => <option key={p.id} value={p.id}>{p.lastName}, {p.firstName}</option>)
+                    }
                   </select>
                 </div>
-              )}
 
+                <div>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>Prestación</label>
+                  <select 
+                    className="form-control" 
+                    value={formData.benefitId} 
+                    onChange={e => setFormData({...formData, benefitId: e.target.value})} 
+                    required
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: 'white' }}
+                  >
+                    <option value="" disabled>Seleccione una prestación</option>
+                    {benefits.map(s => <option key={s.id} value={s.id}>{s.name} ({s.duration} min)</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 2: Profesional Asignado & Repetir sesiones */}
+              <div style={{ display: 'grid', gridTemplateColumns: user.role === 'admin' ? '1fr 1fr' : '1fr', gap: '1rem', marginBottom: '1rem' }}>
+                {user.role === 'admin' && (
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>Profesional Asignado</label>
+                    <select 
+                      className="form-control" 
+                      value={formData.professionalId} 
+                      onChange={e => setFormData({...formData, professionalId: e.target.value})} 
+                      required
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: 'white' }}
+                    >
+                      <option value="" disabled>Seleccione profesional</option>
+                      {professionals.map(p => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>Repetir sesiones</label>
+                  <select 
+                    value={formData.repetitions}
+                    onChange={e => setFormData({...formData, repetitions: e.target.value})}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: 'white' }}
+                  >
+                    {[...Array(10)].map((_, i) => (
+                      <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'vez' : 'sesiones semanales'}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 3: Fecha, Inicio, Fin */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>Fecha</label>
@@ -477,7 +583,7 @@ const Agenda = () => {
                     required 
                     value={formData.date} 
                     onChange={e => setFormData({...formData, date: e.target.value})}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ddd' }}
                   />
                 </div>
                 <div>
@@ -487,7 +593,7 @@ const Agenda = () => {
                     required 
                     value={formData.startTime} 
                     onChange={e => setFormData({...formData, startTime: e.target.value})}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ddd' }}
                   />
                 </div>
                 <div>
@@ -497,24 +603,35 @@ const Agenda = () => {
                     required 
                     value={formData.endTime} 
                     onChange={e => setFormData({...formData, endTime: e.target.value})}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ddd' }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem', marginBottom: '1rem', alignItems: 'end' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>Repetir sesiones</label>
-                  <select 
-                    value={formData.repetitions}
-                    onChange={e => setFormData({...formData, repetitions: e.target.value})}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: 'white' }}
-                  >
-                    {[...Array(10)].map((_, i) => (
-                      <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'vez' : 'sesiones semanales'}</option>
-                    ))}
-                  </select>
+              {/* Row 4: Status Checkboxes */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div style={{ 
+                  padding: '8px 12px', 
+                  borderRadius: '8px', 
+                  backgroundColor: '#f0fdf4', 
+                  border: '1px solid #bbf7d0', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.8rem',
+                  height: '42px'
+                }}>
+                  <input 
+                    type="checkbox" 
+                    id="confirmed"
+                    checked={formData.confirmed}
+                    onChange={(e) => setFormData({...formData, confirmed: e.target.checked})}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer', margin: 0 }}
+                  />
+                  <label htmlFor="confirmed" style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#15803d', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}>
+                    <CheckCheck size={16} /> ¿Confirmó?
+                  </label>
                 </div>
+
                 <div style={{ 
                   padding: '8px 12px', 
                   borderRadius: '8px', 
@@ -533,17 +650,19 @@ const Agenda = () => {
                     style={{ width: '18px', height: '18px', cursor: 'pointer', margin: 0 }}
                   />
                   <label htmlFor="attended" style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#0369a1', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}>
-                    <CheckCircle2 size={16} /> ¿Vino?
+                    <CheckCircle2 size={16} /> ¿Asistió?
                   </label>
                 </div>
               </div>
 
+              {/* Row 5: Notes */}
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>Notas</label>
                 <textarea 
+                  rows="2"
                   value={formData.notes} 
                   onChange={e => setFormData({...formData, notes: e.target.value})}
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ddd', resize: 'vertical' }}
                 />
               </div>
 

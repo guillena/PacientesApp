@@ -55,8 +55,24 @@ app.use((err, req, res, next) => {
 const { initBirthdayCron } = require('./src/utils/birthdayCron');
 
 // Database Sync and Start Server
-sequelize.sync().then(() => {
+sequelize.sync().then(async () => {
   console.log('Database connected and synced');
+  
+  // Automatic safe column migration for Appointments table
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableDescription = await queryInterface.describeTable('Appointments');
+    if (!tableDescription.confirmed) {
+      await queryInterface.addColumn('Appointments', 'confirmed', {
+        type: require('sequelize').DataTypes.BOOLEAN,
+        defaultValue: false
+      });
+      console.log('[Migration] Added column "confirmed" to Appointments table successfully');
+    }
+  } catch (migErr) {
+    console.log('[Migration check]', migErr.message);
+  }
+
   initBirthdayCron();
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);

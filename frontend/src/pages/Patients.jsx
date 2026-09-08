@@ -1157,7 +1157,7 @@ const Patients = () => {
                       <th style={{ padding: '12px' }}>Hora</th>
                       <th style={{ padding: '12px' }}>Profesional</th>
                       <th style={{ padding: '12px' }}>Prestación</th>
-                      <th style={{ padding: '12px', textAlign: 'center' }}>Vino</th>
+                      <th style={{ padding: '12px', textAlign: 'center' }}>Asistió</th>
                     </tr>
                   </thead>
                   <tbody>

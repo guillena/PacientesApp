@@ -3,7 +3,7 @@ const { Op } = require('sequelize');
 
 const createAppointment = async (req, res) => {
   try {
-    const { patientId, benefitId, startTime, endTime, notes, attended, repetitionId } = req.body;
+    const { patientId, benefitId, startTime, endTime, notes, attended, confirmed, repetitionId } = req.body;
     let professionalId = req.professional.id; // Default to self
 
     console.log('CREATING APPOINTMENT:', req.body);
@@ -21,6 +21,7 @@ const createAppointment = async (req, res) => {
       endTime,
       notes,
       attended,
+      confirmed,
       repetitionId
     });
 
