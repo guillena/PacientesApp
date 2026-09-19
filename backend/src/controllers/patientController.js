@@ -210,23 +210,43 @@ const deletePatient = async (req, res) => {
 
     const folderName = patient.docNumber;
 
-    // 1. Delete Documents from S3 / Local
+    // 1. Delete ALL Documents/Folder from S3 and Local for this patient
     const bucketName = process.env.BUCKET_NAME || process.env.BUCKET;
-    if (patient.PatientDocuments && patient.PatientDocuments.length > 0) {
-      if (bucketName) {
-        // --- MODALIDAD S3 ---
-        const { DeleteObjectsCommand } = require('@aws-sdk/client-s3');
-        const s3 = new S3Client({
-          region: process.env.REGION || 'us-east-1',
-          endpoint: process.env.ENDPOINT,
-          credentials: {
-            accessKeyId: process.env.ACCESS_KEY_ID,
-            secretAccessKey: process.env.SECRET_ACCESS_KEY,
-          },
-          forcePathStyle: true,
-        });
+    if (bucketName) {
+      // --- MODALIDAD S3: Eliminar todos los objetos de la carpeta del paciente ---
+      const { ListObjectsV2Command, DeleteObjectsCommand } = require('@aws-sdk/client-s3');
+      const s3 = new S3Client({
+        region: process.env.REGION || 'us-east-1',
+        endpoint: process.env.ENDPOINT,
+        credentials: {
+          accessKeyId: process.env.ACCESS_KEY_ID,
+          secretAccessKey: process.env.SECRET_ACCESS_KEY,
+        },
+        forcePathStyle: true,
+      });
 
-        const keysToDelete = patient.PatientDocuments.map(doc => {
+      const prefixes = new Set([`${folderName}/`, `${id}/`]);
+      const keysToDelete = new Set();
+
+      // Collect keys by prefix listing
+      for (const prefix of prefixes) {
+        try {
+          const listCmd = new ListObjectsV2Command({
+            Bucket: bucketName,
+            Prefix: prefix
+          });
+          const listRes = await s3.send(listCmd);
+          if (listRes.Contents && listRes.Contents.length > 0) {
+            listRes.Contents.forEach(item => keysToDelete.add(item.Key));
+          }
+        } catch (err) {
+          console.warn(`S3 List Warning for prefix ${prefix}:`, err);
+        }
+      }
+
+      // Also collect keys from DB records as fallback
+      if (patient.PatientDocuments && patient.PatientDocuments.length > 0) {
+        patient.PatientDocuments.forEach(doc => {
           try {
             const urlObj = new URL(doc.url);
             let key = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
@@ -236,25 +256,30 @@ const deletePatient = async (req, res) => {
             if (key.startsWith('uploads/')) {
               key = key.substring('uploads/'.length);
             }
-            return { Key: decodeURIComponent(key) };
-          } catch (e) { return null; }
-        }).filter(item => item !== null);
+            keysToDelete.add(decodeURIComponent(key));
+          } catch (e) {}
+        });
+      }
 
-        if (keysToDelete.length > 0) {
-          const deleteCommand = new DeleteObjectsCommand({
-            Bucket: bucketName,
-            Delete: { Objects: keysToDelete }
-          });
-          await s3.send(deleteCommand).catch(err => console.error('S3 Delete Warning:', err));
-        }
+      if (keysToDelete.size > 0) {
+        const objects = Array.from(keysToDelete).map(k => ({ Key: k }));
+        const deleteCommand = new DeleteObjectsCommand({
+          Bucket: bucketName,
+          Delete: { Objects: objects }
+        });
+        await s3.send(deleteCommand).catch(err => console.error('S3 Delete Patient Folder Warning:', err));
       }
-      
-      // Cleanup local folder if it exists
-      const uploadDir = path.join(__dirname, '../../uploads');
-      const patientDir = path.join(uploadDir, folderName);
-      if (fs.existsSync(patientDir)) {
-        try { fs.rmSync(patientDir, { recursive: true, force: true }); } catch (e) {}
-      }
+    }
+
+    // Cleanup local folder if it exists
+    const uploadDir = path.join(__dirname, '../../uploads');
+    const patientDir = path.join(uploadDir, folderName);
+    const idDir = path.join(uploadDir, id);
+    if (fs.existsSync(patientDir)) {
+      try { fs.rmSync(patientDir, { recursive: true, force: true }); } catch (e) {}
+    }
+    if (fs.existsSync(idDir)) {
+      try { fs.rmSync(idDir, { recursive: true, force: true }); } catch (e) {}
     }
 
     // 2. Manually delete associations (Safer for some DB constraints)
@@ -265,7 +290,7 @@ const deletePatient = async (req, res) => {
     // 3. Final Patient Delete
     await patient.destroy();
     
-    res.send({ message: 'Paciente eliminado exitosamente' });
+    res.send({ message: 'Paciente y sus archivos eliminados exitosamente' });
   } catch (e) {
     console.error('SERVER ERROR DELETE PATIENT:', e);
     res.status(500).send({ 
