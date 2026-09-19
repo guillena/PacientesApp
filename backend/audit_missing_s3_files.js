@@ -139,6 +139,13 @@ async function auditFiles() {
         console.log('');
       }
     }
+
+    console.log('\n📋 LISTA RESUMIDA DE FALTANTES EN S3:');
+    console.log('--------------------------------------------------------------------------------');
+    missingS3Docs.forEach((d, idx) => {
+      console.log(`${idx + 1}. PACIENTE: ${d.patientName} | DNI: ${d.docNumber} | DOCUMENTO: ${d.fileName}`);
+    });
+    console.log('--------------------------------------------------------------------------------\n');
   }
 
   console.log('--------------------------------------------------------------------------------');
