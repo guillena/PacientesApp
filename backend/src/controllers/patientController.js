@@ -141,20 +141,52 @@ const deletePatientDocument = async (req, res) => {
     const doc = await PatientDocument.findOne({ where: { id: docId, patientId: id } });
     if (!doc) return res.status(404).send();
 
-    // 1. Delete physical file if using local storage
-    const patient = await Patient.findByPk(id);
-    if (patient) {
-      const folderName = patient.docNumber;
-      // Get filename from URL
-      const fileName = path.basename(doc.url);
-      const filePath = path.join(__dirname, '../../uploads', folderName, fileName);
-      
-      if (fs.existsSync(filePath)) {
-        try {
-          fs.unlinkSync(filePath);
-          console.log(`Deleted file: ${filePath}`);
-        } catch (err) {
-          console.warn(`Could not delete file ${filePath}:`, err);
+    const bucketName = process.env.BUCKET_NAME || process.env.BUCKET;
+    if (bucketName) {
+      // 1. Delete physical file from S3
+      const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+      const s3 = new S3Client({
+        region: process.env.REGION || 'us-east-1',
+        endpoint: process.env.ENDPOINT,
+        credentials: {
+          accessKeyId: process.env.ACCESS_KEY_ID,
+          secretAccessKey: process.env.SECRET_ACCESS_KEY,
+        },
+        forcePathStyle: true,
+      });
+
+      try {
+        const urlObj = new URL(doc.url);
+        let key = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
+        if (bucketName && key.startsWith(`${bucketName}/`)) {
+          key = key.substring(bucketName.length + 1);
+        }
+        if (key.startsWith('uploads/')) {
+          key = key.substring('uploads/'.length);
+        }
+        await s3.send(new DeleteObjectCommand({
+          Bucket: bucketName,
+          Key: decodeURIComponent(key)
+        }));
+      } catch (err) {
+        console.warn('S3 Delete Single Doc Warning:', err);
+      }
+    } else {
+      // 1. Delete physical file if using local storage
+      const patient = await Patient.findByPk(id);
+      if (patient) {
+        const folderName = patient.docNumber;
+        // Get filename from URL
+        const fileName = path.basename(doc.url);
+        const filePath = path.join(__dirname, '../../uploads', folderName, fileName);
+        
+        if (fs.existsSync(filePath)) {
+          try {
+            fs.unlinkSync(filePath);
+            console.log(`Deleted file: ${filePath}`);
+          } catch (err) {
+            console.warn(`Could not delete file ${filePath}:`, err);
+          }
         }
       }
     }
@@ -200,6 +232,9 @@ const deletePatient = async (req, res) => {
             let key = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
             if (bucketName && key.startsWith(`${bucketName}/`)) {
               key = key.substring(bucketName.length + 1);
+            }
+            if (key.startsWith('uploads/')) {
+              key = key.substring('uploads/'.length);
             }
             return { Key: decodeURIComponent(key) };
           } catch (e) { return null; }
@@ -273,6 +308,9 @@ const getPatientDocument = async (req, res) => {
       if (bucketName && key.startsWith(`${bucketName}/`)) {
         key = key.substring(bucketName.length + 1);
       }
+      if (key.startsWith('uploads/')) {
+        key = key.substring('uploads/'.length);
+      }
       
       const command = new GetObjectCommand({
         Bucket: bucketName,
@@ -297,7 +335,11 @@ const getPatientDocument = async (req, res) => {
   } catch (e) {
     console.error('ERROR VIEWING DOCUMENT:', e);
     if (!res.headersSent) {
-      res.status(500).send({ error: 'Error al obtener el documento' });
+      if (e.name === 'NoSuchKey' || e.$metadata?.httpStatusCode === 404) {
+        res.status(404).send({ error: 'Documento no encontrado en el almacenamiento' });
+      } else {
+        res.status(500).send({ error: 'Error al obtener el documento' });
+      }
     }
   }
 };
