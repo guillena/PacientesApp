@@ -179,8 +179,9 @@ const deletePatient = async (req, res) => {
     const folderName = patient.docNumber;
 
     // 1. Delete Documents from S3 / Local
+    const bucketName = process.env.BUCKET_NAME || process.env.BUCKET;
     if (patient.PatientDocuments && patient.PatientDocuments.length > 0) {
-      if (process.env.BUCKET_NAME) {
+      if (bucketName) {
         // --- MODALIDAD S3 ---
         const { DeleteObjectsCommand } = require('@aws-sdk/client-s3');
         const s3 = new S3Client({
@@ -196,14 +197,17 @@ const deletePatient = async (req, res) => {
         const keysToDelete = patient.PatientDocuments.map(doc => {
           try {
             const urlObj = new URL(doc.url);
-            const key = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
+            let key = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
+            if (bucketName && key.startsWith(`${bucketName}/`)) {
+              key = key.substring(bucketName.length + 1);
+            }
             return { Key: decodeURIComponent(key) };
           } catch (e) { return null; }
         }).filter(item => item !== null);
 
         if (keysToDelete.length > 0) {
           const deleteCommand = new DeleteObjectsCommand({
-            Bucket: process.env.BUCKET_NAME,
+            Bucket: bucketName,
             Delete: { Objects: keysToDelete }
           });
           await s3.send(deleteCommand).catch(err => console.error('S3 Delete Warning:', err));
@@ -250,7 +254,8 @@ const getPatientDocument = async (req, res) => {
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(doc.originalName)}"`);
 
-    if (process.env.BUCKET_NAME) {
+    const bucketName = process.env.BUCKET_NAME || process.env.BUCKET;
+    if (bucketName) {
       // --- MODALIDAD S3 (PRODUCCIÓN) ---
       const s3 = new S3Client({
         region: process.env.REGION || 'us-east-1',
@@ -264,10 +269,13 @@ const getPatientDocument = async (req, res) => {
 
       // Extract key from URL
       const urlObj = new URL(doc.url);
-      const key = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
+      let key = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
+      if (bucketName && key.startsWith(`${bucketName}/`)) {
+        key = key.substring(bucketName.length + 1);
+      }
       
       const command = new GetObjectCommand({
-        Bucket: process.env.BUCKET_NAME,
+        Bucket: bucketName,
         Key: decodeURIComponent(key)
       });
 

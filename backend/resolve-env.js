@@ -19,11 +19,16 @@ const ENV_FILE = path.join(__dirname, '.env');
 // The bucket-related variables Railway injects via service references.
 const BUCKET_VARS = [
   'BUCKET_NAME',
+  'BUCKET',
   'REGION',
   'ENDPOINT',
   'ACCESS_KEY_ID',
   'SECRET_ACCESS_KEY',
 ];
+
+if (process.env.BUCKET && !process.env.BUCKET_NAME) {
+  process.env.BUCKET_NAME = process.env.BUCKET;
+}
 
 // ---------------------------------------------------------------------------
 // Read the existing .env file (if any) and parse the keys already defined.

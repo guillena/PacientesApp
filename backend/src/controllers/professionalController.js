@@ -122,9 +122,10 @@ const downloadAllFiles = async (req, res) => {
     const archive = archiver('zip', { zlib: { level: 9 } });
     archive.pipe(res);
 
-    if (process.env.BUCKET_NAME) {
+    const bucketName = process.env.BUCKET_NAME || process.env.BUCKET;
+    if (bucketName) {
       // --- MODALIDAD S3 (PRODUCCIÓN) ---
-      console.log('[ARCHIVE] Descargando desde S3:', process.env.BUCKET_NAME);
+      console.log('[ARCHIVE] Descargando desde S3:', bucketName);
       const s3 = new S3Client({
         region: process.env.REGION || 'us-east-1',
         endpoint: process.env.ENDPOINT,
@@ -135,12 +136,12 @@ const downloadAllFiles = async (req, res) => {
         forcePathStyle: true,
       });
 
-      const listCommand = new ListObjectsV2Command({ Bucket: process.env.BUCKET_NAME });
+      const listCommand = new ListObjectsV2Command({ Bucket: bucketName });
       const { Contents } = await s3.send(listCommand);
 
       if (Contents && Contents.length > 0) {
         for (const item of Contents) {
-          const getCommand = new GetObjectCommand({ Bucket: process.env.BUCKET_NAME, Key: item.Key });
+          const getCommand = new GetObjectCommand({ Bucket: bucketName, Key: item.Key });
           const response = await s3.send(getCommand);
           archive.append(response.Body, { name: item.Key });
         }

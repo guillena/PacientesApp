@@ -5,8 +5,9 @@ const fs = require('fs');
 const path = require('path');
 const { Patient } = require('../models');
 
-// Determinamos si usamos S3 basado en si BUCKET_NAME está definido en .env (o inyectado en Railway)
-const useS3 = !!process.env.BUCKET_NAME;
+// Determinamos si usamos S3 basado en si BUCKET_NAME o BUCKET está definido en .env (o inyectado en Railway)
+const bucketName = process.env.BUCKET_NAME || process.env.BUCKET;
+const useS3 = !!bucketName;
 
 let storage;
 
@@ -25,7 +26,7 @@ if (useS3) {
 
   storage = multerS3({
     s3: s3Config,
-    bucket: process.env.BUCKET_NAME,
+    bucket: bucketName,
     // acl: 'public-read', // Descomentar si el bucket necesita que el archivo sea público y lo permite
     metadata: function (req, file, cb) {
       cb(null, { fieldName: file.fieldname });
