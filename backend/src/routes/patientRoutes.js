@@ -2,7 +2,8 @@ const express = require('express');
 const { 
   createPatient, getPatients, getPatient, updatePatient, 
   getDocumentTypes, uploadPatientDocument, deletePatientDocument, 
-  deletePatient, getPatientDocument, triggerBirthdayEmail 
+  deletePatient, getPatientDocument, triggerBirthdayEmail,
+  getPatientTests, addPatientTest, deletePatientTest
 } = require('../controllers/patientController');
 const { auth, isAdmin } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -20,5 +21,10 @@ router.delete('/:id', auth, isAdmin, deletePatient);
 router.post('/:id/documents', auth, upload.single('file'), uploadPatientDocument);
 router.delete('/:id/documents/:docId', auth, deletePatientDocument);
 router.get('/document/:docId/view', auth, getPatientDocument);
+
+// Test handling endpoints
+router.get('/:id/tests', auth, getPatientTests);
+router.post('/:id/tests', auth, addPatientTest);
+router.delete('/:id/tests/:testId', auth, isAdmin, deletePatientTest);
 
 module.exports = router;

@@ -32,13 +32,21 @@ if (useS3) {
       cb(null, { fieldName: file.fieldname });
     },
     key: function (req, file, cb) {
-      const { id } = req.params;
-      Patient.findByPk(id).then(patient => {
-        const folderName = patient ? patient.docNumber : id;
-        // Keep original name but prepend a timestamp to avoid collisions
-        const fileName = `${Date.now()}-${file.originalname}`;
-        cb(null, `${folderName}/${fileName}`);
-      }).catch(err => cb(err));
+      const id = req.params.id || req.params.professionalId;
+      if (req.originalUrl.includes('/professionals/')) {
+        const { Professional } = require('../models');
+        Professional.findByPk(id).then(prof => {
+          const folderName = prof ? prof.username : id;
+          const fileName = `${Date.now()}-${file.originalname}`;
+          cb(null, `profesionales/${folderName}/${fileName}`);
+        }).catch(err => cb(err));
+      } else {
+        Patient.findByPk(id).then(patient => {
+          const folderName = patient ? patient.docNumber : id;
+          const fileName = `${Date.now()}-${file.originalname}`;
+          cb(null, `${folderName}/${fileName}`);
+        }).catch(err => cb(err));
+      }
     }
   });
   console.log('[Storage] Usando almacenamiento en la Nube (S3/Railway Bucket)');
@@ -53,15 +61,27 @@ if (useS3) {
 
   storage = multer.diskStorage({
     destination: function (req, file, cb) {
-      const { id } = req.params;
-      Patient.findByPk(id).then(patient => {
-        const folderName = patient ? patient.docNumber : id;
-        const patientDir = path.join(uploadDir, folderName);
-        if (!fs.existsSync(patientDir)){
-            fs.mkdirSync(patientDir, { recursive: true });
-        }
-        cb(null, patientDir);
-      }).catch(err => cb(err));
+      const id = req.params.id || req.params.professionalId;
+      if (req.originalUrl.includes('/professionals/')) {
+        const { Professional } = require('../models');
+        Professional.findByPk(id).then(prof => {
+          const folderName = prof ? prof.username : id;
+          const profDir = path.join(uploadDir, 'profesionales', folderName);
+          if (!fs.existsSync(profDir)){
+              fs.mkdirSync(profDir, { recursive: true });
+          }
+          cb(null, profDir);
+        }).catch(err => cb(err));
+      } else {
+        Patient.findByPk(id).then(patient => {
+          const folderName = patient ? patient.docNumber : id;
+          const patientDir = path.join(uploadDir, folderName);
+          if (!fs.existsSync(patientDir)){
+              fs.mkdirSync(patientDir, { recursive: true });
+          }
+          cb(null, patientDir);
+        }).catch(err => cb(err));
+      }
     },
     filename: function (req, file, cb) {
       // Keep original name but prepend a timestamp to avoid collisions

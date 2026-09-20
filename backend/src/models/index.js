@@ -8,6 +8,10 @@ const ProfessionalBenefits = require('./ProfessionalBenefits');
 const Activity = require('./Activity');
 const PatientDocument = require('./PatientDocument');
 const Task = require('./Task');
+const Test = require('./Test');
+const PatientTest = require('./PatientTest');
+const ProfDocType = require('./ProfDocType');
+const ProfessionalDocument = require('./ProfessionalDocument');
 
 // Associations
 
@@ -51,6 +55,20 @@ PatientDocument.belongsTo(Patient, { foreignKey: 'patientId' });
 Professional.hasMany(Activity, { foreignKey: 'professionalId' });
 Activity.belongsTo(Professional, { foreignKey: 'professionalId' });
 
+// Patient <-> Test (Many-to-Many)
+Patient.hasMany(PatientTest, { foreignKey: 'patientId', onDelete: 'CASCADE' });
+PatientTest.belongsTo(Patient, { foreignKey: 'patientId' });
+Test.hasMany(PatientTest, { foreignKey: 'testId', onDelete: 'CASCADE' });
+PatientTest.belongsTo(Test, { foreignKey: 'testId' });
+
+// Professional -> ProfessionalDocument (One-to-Many)
+Professional.hasMany(ProfessionalDocument, { foreignKey: 'professionalId', onDelete: 'CASCADE' });
+ProfessionalDocument.belongsTo(Professional, { foreignKey: 'professionalId' });
+
+// ProfDocType -> ProfessionalDocument (One-to-Many)
+ProfDocType.hasMany(ProfessionalDocument, { foreignKey: 'profDocTypeId', onDelete: 'RESTRICT' });
+ProfessionalDocument.belongsTo(ProfDocType, { foreignKey: 'profDocTypeId' });
+
 module.exports = {
   sequelize,
   Benefit,
@@ -60,5 +78,9 @@ module.exports = {
   Appointment,
   Activity,
   PatientDocument,
-  Task
+  Task,
+  Test,
+  PatientTest,
+  ProfDocType,
+  ProfessionalDocument
 };

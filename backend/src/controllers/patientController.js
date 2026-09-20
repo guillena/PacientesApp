@@ -1,4 +1,4 @@
-const { Patient, DocumentType, PatientDocument, Appointment, Activity } = require('../models');
+const { Patient, DocumentType, PatientDocument, Appointment, Activity, Test, PatientTest } = require('../models');
 const fs = require('fs');
 const path = require('path');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
@@ -286,6 +286,7 @@ const deletePatient = async (req, res) => {
     await Appointment.destroy({ where: { patientId: id } });
     await Activity.destroy({ where: { patientId: id } });
     await PatientDocument.destroy({ where: { patientId: id } });
+    await PatientTest.destroy({ where: { patientId: id } });
 
     // 3. Final Patient Delete
     await patient.destroy();
@@ -379,6 +380,61 @@ const triggerBirthdayEmail = async (req, res) => {
   }
 };
 
+const getPatientTests = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tests = await PatientTest.findAll({
+      where: { patientId: id },
+      include: [{ model: Test }],
+      order: [['date', 'DESC']]
+    });
+    res.send(tests);
+  } catch (e) {
+    res.status(500).send({ error: 'Error al obtener pruebas del paciente' });
+  }
+};
+
+const addPatientTest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { testId, date } = req.body;
+    
+    if (!testId || !date) {
+      return res.status(400).send({ error: 'Faltan datos obligatorios' });
+    }
+
+    const patientTest = await PatientTest.create({
+      patientId: id,
+      testId,
+      date
+    });
+
+    const testWithDetails = await PatientTest.findByPk(patientTest.id, {
+      include: [{ model: Test }]
+    });
+
+    res.status(201).send(testWithDetails);
+  } catch (e) {
+    res.status(500).send({ error: 'Error al agregar la prueba al paciente' });
+  }
+};
+
+const deletePatientTest = async (req, res) => {
+  try {
+    const { id, testId } = req.params;
+    const patientTest = await PatientTest.findOne({
+      where: { id: testId, patientId: id }
+    });
+
+    if (!patientTest) return res.status(404).send();
+
+    await patientTest.destroy();
+    res.send({ message: 'Prueba eliminada' });
+  } catch (e) {
+    res.status(500).send({ error: 'Error al eliminar la prueba' });
+  }
+};
+
 module.exports = {
   createPatient,
   getPatients,
@@ -389,5 +445,8 @@ module.exports = {
   deletePatientDocument,
   deletePatient,
   getPatientDocument,
-  triggerBirthdayEmail
+  triggerBirthdayEmail,
+  getPatientTests,
+  addPatientTest,
+  deletePatientTest
 };

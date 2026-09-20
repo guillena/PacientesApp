@@ -41,4 +41,36 @@ const getPatientActivities = async (req, res) => {
   }
 };
 
-module.exports = { createActivity, getPatientActivities };
+const updateActivity = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { description } = req.body;
+    const activity = await Activity.findByPk(id);
+    if (!activity) return res.status(404).send();
+    
+    activity.description = description;
+    await activity.save();
+    
+    const populatedActivity = await Activity.findByPk(activity.id, {
+      include: [{ model: Professional, attributes: ['id', 'firstName', 'lastName'] }]
+    });
+    res.send(populatedActivity);
+  } catch (e) {
+    res.status(400).send(e);
+  }
+};
+
+const deleteActivity = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const activity = await Activity.findByPk(id);
+    if (!activity) return res.status(404).send();
+    
+    await activity.destroy();
+    res.send({ message: 'Actividad eliminada' });
+  } catch (e) {
+    res.status(500).send(e);
+  }
+};
+
+module.exports = { createActivity, getPatientActivities, updateActivity, deleteActivity };

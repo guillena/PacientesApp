@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { Search, UserPlus, Edit3, X, ArrowUpDown, ArrowUp, ArrowDown, Activity, List, Grid, Eye, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCw, FileText, Trash2, Calendar, CheckCircle2, MoreVertical } from 'lucide-react';
+import { Search, UserPlus, Edit3, X, ArrowUpDown, ArrowUp, ArrowDown, Activity, List, Grid, Eye, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCw, FileText, Trash2, Calendar, CheckCircle2, MoreVertical, ClipboardList } from 'lucide-react';
 import MessageModal from '../components/MessageModal';
 import { useAuth } from '../store/AuthContext';
 
@@ -86,6 +86,8 @@ const Patients = () => {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [activities, setActivities] = useState([]);
   const [newActivityDesc, setNewActivityDesc] = useState('');
+  const [editingActivityId, setEditingActivityId] = useState(null);
+  const [editingActivityDesc, setEditingActivityDesc] = useState('');
   
   // State for Sessions (Appointments)
   const [showSessionsModal, setShowSessionsModal] = useState(false);
@@ -95,6 +97,13 @@ const Patients = () => {
   // Tabs and Documents state
   const [activeTab, setActiveTab] = useState('personal');
   const [patientDocs, setPatientDocs] = useState([]);
+
+  // Tests state
+  const [patientTests, setPatientTests] = useState([]);
+  const [availableTests, setAvailableTests] = useState([]);
+  const [newTest, setNewTest] = useState({ testId: '', date: new Date().toISOString().split('T')[0] });
+  const [isLoadingTests, setIsLoadingTests] = useState(false);
+  const [testSearchQuery, setTestSearchQuery] = useState('');
 
   // View Patient state
   const [showViewModal, setShowViewModal] = useState(false);
@@ -125,7 +134,17 @@ const Patients = () => {
   useEffect(() => {
     fetchPatients();
     fetchDocTypes();
+    fetchAvailableTests();
   }, []);
+
+  const fetchAvailableTests = async () => {
+    try {
+      const response = await api.get('/tests');
+      setAvailableTests(response.data.filter(t => t.active));
+    } catch (err) {
+      console.error('Error fetching tests', err);
+    }
+  };
 
   const fetchPatients = async () => {
     setIsLoading(true);
@@ -149,6 +168,39 @@ const Patients = () => {
     } catch (err) {
       console.error('Error fetching doc types', err);
     }
+  };
+
+  const fetchPatientTests = async (id) => {
+    setIsLoadingTests(true);
+    try {
+      const response = await api.get(`/patients/${id}/tests`);
+      setPatientTests(response.data);
+    } catch (err) {
+      console.error('Error fetching patient tests', err);
+    } finally {
+      setIsLoadingTests(false);
+    }
+  };
+
+  const handleAddTest = async () => {
+    try {
+      const response = await api.post(`/patients/${editingId}/tests`, newTest);
+      setPatientTests([response.data, ...patientTests].sort((a, b) => new Date(b.date) - new Date(a.date)));
+      setNewTest({ testId: '', date: new Date().toISOString().split('T')[0] });
+    } catch (err) {
+      showMsg('Error al agregar la prueba', 'alert');
+    }
+  };
+
+  const handleDeleteTest = (testId) => {
+    showMsg('¿Está seguro de que desea eliminar esta prueba?', 'alert', async () => {
+      try {
+        await api.delete(`/patients/${editingId}/tests/${testId}`);
+        setPatientTests(patientTests.filter(pt => pt.id !== testId));
+      } catch (err) {
+        showMsg('Error al eliminar la prueba', 'alert');
+      }
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -200,12 +252,14 @@ const Patients = () => {
     setPatientDocs(patient.PatientDocuments || []);
     setEditingId(patient.id);
     setActiveTab('personal');
+    fetchPatientTests(patient.id);
     setShowModal(true);
   };
 
   const openCreateModal = () => {
     setEditingId(null);
     setPatientDocs([]);
+    setPatientTests([]);
     setFormData({
       firstName: '', lastName: '', docNumber: '', email: '', phone: '', birthDate: '', street: '', number: '', floor: '', apartment: '', province: '', city: '', postalCode: '',
       docTypeId: docTypes.length > 0 ? docTypes[0].id : '',
@@ -217,6 +271,8 @@ const Patients = () => {
 
   const openViewModal = (patient) => {
     setViewingPatient(patient);
+    setPatientTests([]); // Clear previous
+    fetchPatientTests(patient.id);
     setShowViewModal(true);
   };
 
@@ -385,6 +441,36 @@ const Patients = () => {
     }
   };
 
+  const startEditActivity = (act) => {
+    setEditingActivityId(act.id);
+    setEditingActivityDesc(act.description);
+  };
+
+  const handleUpdateActivity = async (id) => {
+    if (!editingActivityDesc.trim()) return;
+    try {
+      const response = await api.patch(`/activities/${id}`, {
+        description: editingActivityDesc
+      });
+      setActivities(activities.map(act => act.id === id ? response.data : act));
+      setEditingActivityId(null);
+      setEditingActivityDesc('');
+    } catch (err) {
+      showMsg('Error al actualizar actividad.', 'alert');
+    }
+  };
+
+  const handleDeleteActivity = (id) => {
+    showMsg('¿Está seguro de que desea eliminar esta nota?', 'alert', async () => {
+      try {
+        await api.delete(`/activities/${id}`);
+        setActivities(activities.filter(act => act.id !== id));
+      } catch (err) {
+        showMsg('Error al eliminar actividad.', 'alert');
+      }
+    });
+  };
+
   const openSessions = async (patient) => {
     setSelectedPatient(patient);
     setIsLoadingSessions(true);
@@ -456,6 +542,13 @@ const Patients = () => {
                 style={{ background: 'none', border: 'none', padding: '10px 5px', cursor: 'pointer', borderBottom: activeTab === 'documents' ? '2px solid var(--primary)' : '2px solid transparent', fontWeight: activeTab === 'documents' ? 'bold' : 'normal', color: activeTab === 'documents' ? 'var(--primary)' : '#666' }}
               >
                 Documentos
+              </button>
+              <button 
+                type="button"
+                onClick={() => setActiveTab('tests')}
+                style={{ background: 'none', border: 'none', padding: '10px 5px', cursor: 'pointer', borderBottom: activeTab === 'tests' ? '2px solid var(--primary)' : '2px solid transparent', fontWeight: activeTab === 'tests' ? 'bold' : 'normal', color: activeTab === 'tests' ? 'var(--primary)' : '#666' }}
+              >
+                Pruebas
               </button>
             </div>
 
@@ -624,6 +717,113 @@ const Patients = () => {
                       )) : (
                         <div style={{ padding: '1rem', textAlign: 'center', color: '#999', fontSize: '0.9rem' }}>
                           No hay documentos cargados.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: activeTab === 'tests' ? 'block' : 'none' }}>
+                {!editingId ? (
+                  <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: '#f9f9f9', borderRadius: '8px', color: '#666' }}>
+                    Para poder cargar pruebas, primero debes guardar el perfil de este nuevo paciente.
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+                      <div style={{ flex: 1, position: 'relative' }}>
+                        <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px', color: '#666' }}>Prueba</label>
+                        <div 
+                          style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', backgroundColor: 'white', cursor: 'pointer', minHeight: '35px', display: 'flex', alignItems: 'center' }}
+                          onClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown === 'testSearch' ? null : 'testSearch'); }}
+                        >
+                           <span style={{ color: newTest.testId ? 'inherit' : '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                             {newTest.testId ? availableTests.find(t => t.id === newTest.testId)?.name : 'Seleccione una prueba...'}
+                           </span>
+                        </div>
+                        
+                        {activeDropdown === 'testSearch' && (
+                          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '6px', marginTop: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxHeight: '300px', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+                            <div style={{ padding: '8px', borderBottom: '1px solid #eee' }}>
+                               <input 
+                                 type="text" 
+                                 autoFocus
+                                 placeholder="Buscar por nombre o descripción..."
+                                 value={testSearchQuery}
+                                 onChange={e => setTestSearchQuery(e.target.value)}
+                                 style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
+                               />
+                            </div>
+                            <div style={{ overflowY: 'auto' }}>
+                               {availableTests
+                                 .filter(t => 
+                                   t.name.toLowerCase().includes(testSearchQuery.toLowerCase()) || 
+                                   t.category.toLowerCase().includes(testSearchQuery.toLowerCase()) ||
+                                   (t.description && t.description.toLowerCase().includes(testSearchQuery.toLowerCase()))
+                                 )
+                                 .map(t => (
+                                 <div 
+                                   key={t.id} 
+                                   style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f9f9f9' }}
+                                   onClick={() => {
+                                      setNewTest({...newTest, testId: t.id});
+                                      setActiveDropdown(null);
+                                      setTestSearchQuery('');
+                                   }}
+                                 >
+                                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{t.name}</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#666' }}>{t.category}</div>
+                                 </div>
+                               ))}
+                               {availableTests.filter(t => t.name.toLowerCase().includes(testSearchQuery.toLowerCase()) || t.category.toLowerCase().includes(testSearchQuery.toLowerCase()) || (t.description && t.description.toLowerCase().includes(testSearchQuery.toLowerCase()))).length === 0 && (
+                                 <div style={{ padding: '8px 12px', color: '#999', fontSize: '0.85rem', textAlign: 'center' }}>No se encontraron pruebas.</div>
+                               )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ width: '140px' }}>
+                        <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px', color: '#666' }}>Fecha</label>
+                        <input 
+                          type="date" 
+                          style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd' }}
+                          value={newTest.date}
+                          onChange={e => setNewTest({...newTest, date: e.target.value})}
+                          max={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]}
+                        />
+                      </div>
+                      <button 
+                        type="button"
+                        className="btn btn-primary" 
+                        onClick={handleAddTest}
+                        disabled={!newTest.testId || !newTest.date}
+                      >
+                        Agregar
+                      </button>
+                    </div>
+
+                    <div style={{ border: '1px solid #eee', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+                      {isLoadingTests ? (
+                        <div style={{ padding: '1rem', textAlign: 'center', color: '#666' }}>Cargando pruebas...</div>
+                      ) : patientTests.length > 0 ? patientTests.map(pt => (
+                        <div key={pt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', borderBottom: '1px solid #eee' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <ClipboardList size={18} color="var(--primary)" />
+                            <div>
+                              <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: 'var(--primary)' }}>{pt.Test?.name}</div>
+                              <div style={{ fontSize: '0.8rem', color: '#666' }}>{pt.Test?.category} | {new Date(pt.date + 'T12:00:00').toLocaleDateString()}</div>
+                            </div>
+                          </div>
+                          {isAdmin && (
+                            <button type="button" onClick={() => handleDeleteTest(pt.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
+                              <X size={16} />
+                            </button>
+                          )}
+                        </div>
+                      )) : (
+                        <div style={{ padding: '1rem', textAlign: 'center', color: '#999', fontSize: '0.9rem' }}>
+                          No hay pruebas registradas.
                         </div>
                       )}
                     </div>
@@ -885,9 +1085,32 @@ const Patients = () => {
                 <div key={act.id} style={{ padding: '15px', border: '1px solid #eee', borderRadius: '8px', marginBottom: '1rem', backgroundColor: '#fdfdfd' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.85rem', color: '#666' }}>
                     <strong>{act.Professional ? `${act.Professional.firstName} ${act.Professional.lastName}` : 'Profesional'}</strong>
-                    <span>{new Date(act.date).toLocaleString()}</span>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <span>{new Date(act.date || act.createdAt).toLocaleString()}</span>
+                      {isAdmin && (
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                          <button type="button" onClick={() => startEditActivity(act)} style={{ background: 'transparent', border: 'none', color: '#4a90e2', cursor: 'pointer' }}><Edit3 size={14} /></button>
+                          <button type="button" onClick={() => handleDeleteActivity(act.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}><X size={14} /></button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ whiteSpace: 'pre-wrap', color: 'var(--dark-text)' }}>{act.description}</div>
+                  {editingActivityId === act.id ? (
+                    <div style={{ marginTop: '10px' }}>
+                      <textarea 
+                        rows="3" 
+                        style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                        value={editingActivityDesc}
+                        onChange={e => setEditingActivityDesc(e.target.value)}
+                      />
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', justifyContent: 'flex-end' }}>
+                        <button type="button" className="btn" onClick={() => setEditingActivityId(null)}>Cancelar</button>
+                        <button type="button" className="btn btn-primary" onClick={() => handleUpdateActivity(act.id)}>Guardar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ whiteSpace: 'pre-wrap', color: 'var(--dark-text)' }}>{act.description}</div>
+                  )}
                 </div>
               )) : (
                 <div style={{ textAlign: 'center', padding: '2rem', color: '#999' }}>No hay actividades registradas.</div>
@@ -983,6 +1206,29 @@ const Patients = () => {
                     </ul>
                   ) : (
                     <p style={{ margin: 0, color: '#888', fontStyle: 'italic' }}>No hay documentos cargados.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Tests section */}
+              <div>
+                <h3 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '10px' }}>Pruebas Realizadas</h3>
+                <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '15px', backgroundColor: '#f9f9f9', maxHeight: '200px', overflowY: 'auto' }}>
+                  {isLoadingTests ? (
+                    <p style={{ margin: 0, color: '#888', fontStyle: 'italic' }}>Cargando pruebas...</p>
+                  ) : patientTests && patientTests.length > 0 ? (
+                    <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                      {patientTests.map(pt => (
+                        <li key={pt.id} style={{ marginBottom: '8px' }}>
+                          <span style={{ fontWeight: 'bold' }}>{pt.Test?.name}</span>
+                          <span style={{ color: '#666', fontSize: '0.9rem', marginLeft: '8px' }}>
+                            ({pt.Test?.category}) - {new Date(pt.date + 'T12:00:00').toLocaleDateString()}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p style={{ margin: 0, color: '#888', fontStyle: 'italic' }}>No hay pruebas registradas.</p>
                   )}
                 </div>
               </div>

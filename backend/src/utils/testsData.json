@@ -1,0 +1,622 @@
+[
+  {
+    "name": "BOEHM 3",
+    "category": "Apt./Aprendizaje"
+  },
+  {
+    "name": "BOEHM 3 PREESCOLAR",
+    "category": "Apt./Aprendizaje"
+  },
+  {
+    "name": "VINELAND 2",
+    "category": "Apt./Aprendizaje"
+  },
+  {
+    "name": "VINELAND 3",
+    "category": "Apt./Aprendizaje"
+  },
+  {
+    "name": "AGL",
+    "category": "Atención"
+  },
+  {
+    "name": "CARAS - R",
+    "category": "Atención"
+  },
+  {
+    "name": "D2",
+    "category": "Atención"
+  },
+  {
+    "name": "D2 - R",
+    "category": "Atención"
+  },
+  {
+    "name": "FI - R",
+    "category": "Atención"
+  },
+  {
+    "name": "NEUROPSI",
+    "category": "Atención"
+  },
+  {
+    "name": "TDAH - 5",
+    "category": "Atención"
+  },
+  {
+    "name": "ABLLS - R",
+    "category": "Autismo/Asperger"
+  },
+  {
+    "name": "ADI - R",
+    "category": "Autismo/Asperger"
+  },
+  {
+    "name": "ADOS - 2",
+    "category": "Autismo/Asperger"
+  },
+  {
+    "name": "CARS 2",
+    "category": "Autismo/Asperger"
+  },
+  {
+    "name": "GADS",
+    "category": "Autismo/Asperger"
+  },
+  {
+    "name": "GARS - 3",
+    "category": "Autismo/Asperger"
+  },
+  {
+    "name": "PEP - 3",
+    "category": "Autismo/Asperger"
+  },
+  {
+    "name": "SCQ",
+    "category": "Autismo/Asperger"
+  },
+  {
+    "name": "BAT. DIAGNÓSTICO OPERATORIO PIAGET",
+    "category": "Batería"
+  },
+  {
+    "name": "BATERÍA 3 WOODCOCK MUÑOZ",
+    "category": "Batería"
+  },
+  {
+    "name": "BERDE (Batería para la Evaluación Rápida de la Discalculia Evolutiva)",
+    "category": "Cálculo"
+  },
+  {
+    "name": "PREDISCAL",
+    "category": "Cálculo"
+  },
+  {
+    "name": "PROCÁLCULO",
+    "category": "Cálculo"
+  },
+  {
+    "name": "TEDI MATH",
+    "category": "Cálculo"
+  },
+  {
+    "name": "TEMA 3",
+    "category": "Cálculo"
+  },
+  {
+    "name": "16PF - 5",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "AE-P",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "BATERÍA \"MI FAMILIA Y YO\"",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "BEI",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "BERS 2S",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "CACIA",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "CAS",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "CDS",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "CMAS -R2",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "COLETAS Y VERDI",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "FFPI - C",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "IAC",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "MACI",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "MAPI",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "MMPI - 2RF",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "PAI",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "PROGRAMA CIPRÉS (Prevención Suicidio Adolescente)",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "SENA",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "SPECI",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "STAI",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "SUCESOS DE VIDA",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "TAMAI",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "TCI",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "TEST DE LOS COLORES",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "TSA",
+    "category": "Clínica/Personalidad"
+  },
+  {
+    "name": "BENDER 2 KOPPITZ",
+    "category": "Desarrollo"
+  },
+  {
+    "name": "DENVER (LIBRO CELESTE Y LIBRO NARANJA)",
+    "category": "Desarrollo"
+  },
+  {
+    "name": "DENVER LIBRO CELESTE",
+    "category": "Desarrollo"
+  },
+  {
+    "name": "DENVER LIBRO NARANJA",
+    "category": "Desarrollo"
+  },
+  {
+    "name": "PDMS 2 (Escala de Desarrollo Motor Peabody II) KIT COMPLETO",
+    "category": "Desarrollo"
+  },
+  {
+    "name": "PDMS 2 (Escala Desarrollo Motor Peabody) SIN Escalera NI Banco",
+    "category": "Desarrollo"
+  },
+  {
+    "name": "REY",
+    "category": "Desarrollo"
+  },
+  {
+    "name": "TADI COMPLETO (impreso y manipulativos)",
+    "category": "Desarrollo"
+  },
+  {
+    "name": "TADI IMPRESO (solo material impreso)",
+    "category": "Desarrollo"
+  },
+  {
+    "name": "TADI MANIPULATIVOS (solo manipulativos)",
+    "category": "Desarrollo"
+  },
+  {
+    "name": "TEPSI",
+    "category": "Desarrollo"
+  },
+  {
+    "name": "VMI BEERY BUKTÉNICA (6° EDICIÓN)",
+    "category": "Desarrollo"
+  },
+  {
+    "name": "VMI BEERY BUKTÉNICA (ED. 2016)",
+    "category": "Desarrollo"
+  },
+  {
+    "name": "ANILLAS",
+    "category": "Func. Ejecutivas"
+  },
+  {
+    "name": "BRIEF 2 (con Plantilla de Corrección)",
+    "category": "Func. Ejecutivas"
+  },
+  {
+    "name": "BRIEF P (con Plantilla de Corrección)",
+    "category": "Func. Ejecutivas"
+  },
+  {
+    "name": "EHS",
+    "category": "Func. Ejecutivas"
+  },
+  {
+    "name": "ENFEN",
+    "category": "Func. Ejecutivas"
+  },
+  {
+    "name": "STROOP",
+    "category": "Func. Ejecutivas"
+  },
+  {
+    "name": "WISCONSIN",
+    "category": "Func. Ejecutivas"
+  },
+  {
+    "name": "ABAS II (COMPLETO)",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "AEI - R",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "BARON ICE",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "BATTELLE",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "BAYLEY III (COMPLETA)",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "BAYLEY III (solo material impreso en papel)",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "BCSE",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "DHAC",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "DOMINÓ D48",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "K - BIT",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "MERRILL PALMER - R (COMPLETA)",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "MERRILL PALMER - R (material en papel)",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "MOCA",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "RAVEN AVANZADA",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "RAVEN COLOREADA",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "RAVEN ESCALA GENERAL",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "RIAS Y RIST",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "SHIPLEY",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "TONI IV",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "TORRE DE LONDRES",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "WAIS IV",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "WISC V",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "WNV",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "WPPSI IV",
+    "category": "Inteligencia"
+  },
+  {
+    "name": "ABC DISLEXIA",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "BLOC - SR",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "CELF - 2 PREESCOLAR SPANISH",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "CELF - 5",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "DST - J",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "ITPA (6ta. Edición)",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "LEE",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "ONE WORD",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "PEABODY III (PPVT-III)",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "PHAI",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "PLI",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "PLON R",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "PLS - 5",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "PRELEC",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "PROESC",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "PROLEC - R",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "PROLEC - SE",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "PROLEC - SE - R",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "PROLEER",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "PROLEXIA",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "RFI (REGISTRO FONOLÓGICO INDUCIDO)",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "TDR",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "TELD-3:S",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "TPL",
+    "category": "Lectura/Escritura"
+  },
+  {
+    "name": "BAYLEY III",
+    "category": "Manipulativos"
+  },
+  {
+    "name": "CAT - CLAMS",
+    "category": "Manipulativos"
+  },
+  {
+    "name": "CELF - 4",
+    "category": "Manipulativos"
+  },
+  {
+    "name": "ENI II",
+    "category": "Manipulativos"
+  },
+  {
+    "name": "MERRILL PALMER - R",
+    "category": "Manipulativos"
+  },
+  {
+    "name": "NEPSY II",
+    "category": "Manipulativos"
+  },
+  {
+    "name": "PEP - 3",
+    "category": "Manipulativos"
+  },
+  {
+    "name": "WNV",
+    "category": "Manipulativos"
+  },
+  {
+    "name": "BANETA",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "BANFE II",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "BANFE III",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "BANPE",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "CUMANES",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "CUMANIN",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "DP - 3",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "ENI II COMPLETA",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "ENI P",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "LURIA DNA",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "LURIA DNI",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "NEPSY II",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "NEURO - KID",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "PERFIL SENSORIAL 2",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "TAVEC",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "TAVECI",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "TEST DE LOS 5 DÍGITOS",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "TOMAL",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "WMS IV",
+    "category": "Neuropsicología"
+  },
+  {
+    "name": "CIP-R (Cuestionario Intereses Profesionales T)",
+    "category": "Orient. Vocacional"
+  },
+  {
+    "name": "EXPLORA",
+    "category": "Orient. Vocacional"
+  },
+  {
+    "name": "IPP-R",
+    "category": "Orient. Vocacional"
+  },
+  {
+    "name": "SOVI - 3",
+    "category": "Orient. Vocacional"
+  },
+  {
+    "name": "CAT - A",
+    "category": "Proyectivo"
+  },
+  {
+    "name": "DFH",
+    "category": "Proyectivo"
+  },
+  {
+    "name": "HTP - DAP",
+    "category": "Proyectivo"
+  },
+  {
+    "name": "TEST DE LA FAMILIA",
+    "category": "Proyectivo"
+  },
+  {
+    "name": "TEST DE LOS GARABATOS",
+    "category": "Proyectivo"
+  }
+]

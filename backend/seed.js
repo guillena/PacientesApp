@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
-const { Professional, DocumentType, Benefit, sequelize } = require('./src/models');
+const { Professional, DocumentType, Benefit, ProfDocType, sequelize } = require('./src/models');
+const { seedTests } = require('./src/utils/seedTests');
 
 const seed = async () => {
   try {
@@ -19,6 +20,12 @@ const seed = async () => {
     // Create Document Types
     await DocumentType.findOrCreate({ where: { name: 'DNI' } });
     await DocumentType.findOrCreate({ where: { name: 'Pasaporte' } });
+
+    // Create Professional Document Types
+    await ProfDocType.findOrCreate({
+      where: { name: 'DNI' },
+      defaults: { name: 'DNI', description: 'Documento Nacional de Identidad', status: true }
+    });
 
     // Create Default Benefits
     const benefits = [
@@ -53,6 +60,9 @@ const seed = async () => {
     } else {
       console.log('✅ Usuario Admin creado con éxito: admin (usuario) / admin123 (clave)');
     }
+
+    // Seed Tests catalogue
+    await seedTests();
 
     process.exit(0);
   } catch (e) {

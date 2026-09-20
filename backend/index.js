@@ -15,6 +15,10 @@ const benefitRoutes = require('./src/routes/benefitRoutes');
 const appointmentRoutes = require('./src/routes/appointmentRoutes');
 const activityRoutes = require('./src/routes/activityRoutes');
 const taskRoutes = require('./src/routes/taskRoutes');
+const testRoutes = require('./src/routes/testRoutes');
+const profDocTypeRoutes = require('./src/routes/profDocTypeRoutes');
+const { Test, ProfDocType } = require('./src/models');
+const { seedTests } = require('./src/utils/seedTests');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -40,6 +44,8 @@ app.use('/api/benefits', benefitRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/tests', testRoutes);
+app.use('/api/prof-doc-types', profDocTypeRoutes);
 
 // Basic Route
 app.get('/health', (req, res) => {
@@ -71,6 +77,31 @@ sequelize.sync().then(async () => {
     }
   } catch (migErr) {
     console.log('[Migration check]', migErr.message);
+  }
+
+  // Auto-seed Tests catalogue if empty
+  try {
+    const testsCount = await Test.count();
+    if (testsCount === 0) {
+      console.log('[Auto-seed] Catálogo de pruebas vacío. Importando...');
+      await seedTests();
+    }
+  } catch (seedErr) {
+    console.error('[Auto-seed Tests error]', seedErr.message);
+  }
+
+  // Auto-seed ProfDocType if empty
+  try {
+    const profDocCount = await ProfDocType.count();
+    if (profDocCount === 0) {
+      console.log('[Auto-seed] Tipos de documento profesional vacío. Creando tipos iniciales...');
+      await ProfDocType.findOrCreate({
+        where: { name: 'DNI' },
+        defaults: { name: 'DNI', description: 'Documento Nacional de Identidad', status: true }
+      });
+    }
+  } catch (profDocErr) {
+    console.error('[Auto-seed ProfDocType error]', profDocErr.message);
   }
 
   initBirthdayCron();

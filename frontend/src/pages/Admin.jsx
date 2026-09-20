@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
-import { Plus, Edit3, Trash2, X, Users, Settings, ChevronUp, ChevronDown, Eye, EyeOff, Folder, Download } from 'lucide-react';
+import { 
+  Plus, Edit3, Trash2, X, Users, Settings, ChevronUp, ChevronDown, 
+  Eye, EyeOff, Folder, Download, ClipboardList, Search, ChevronLeft, ChevronRight, FileText, Upload, File,
+  ZoomIn, ZoomOut, RotateCw, Maximize2, Minimize2
+} from 'lucide-react';
 import MessageModal from '../components/MessageModal';
 
 const Admin = () => {
-  const [activeTab, setActiveTab] = useState('professionals'); // 'professionals', 'benefits' or 'archive'
+  const [activeTab, setActiveTab] = useState('professionals'); // 'professionals', 'benefits', 'archive' or 'tests'
   
   // State for Professionals
   const [professionals, setProfessionals] = useState([]);
@@ -21,8 +25,40 @@ const Admin = () => {
   const [servForm, setServForm] = useState({ name: '', description: '', isAdmission: false });
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
   const [showPassword, setShowPassword] = useState(false);
+
+  // State for Tests (Pruebas)
+  const [tests, setTests] = useState([]);
+  const [isLoadingTests, setIsLoadingTests] = useState(false);
+  const [testCategories, setTestCategories] = useState([]);
+  const [testCategoryFilter, setTestCategoryFilter] = useState('ALL');
+  const [testSearch, setTestSearch] = useState('');
+  const [testSortConfig, setTestSortConfig] = useState({ key: 'name', direction: 'asc' });
+  const [testPage, setTestPage] = useState(1);
+  const [testItemsPerPage, setTestItemsPerPage] = useState(15);
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [editingTestId, setEditingTestId] = useState(null);
+  
+  // Document Viewer states
+  const [showingDoc, setShowingDoc] = useState(null);
+  const [imgZoom, setImgZoom] = useState(1);
+  const [imgRotation, setImgRotation] = useState(0);
+  const [isDocMaximized, setIsDocMaximized] = useState(false);
+  const [testForm, setTestForm] = useState({ name: '', category: '', customCategory: '', description: '', active: true, isNewCat: false });
   
   // State for Global Messages
+  
+  // State for Prof Doc Types
+  const [profDocTypes, setProfDocTypes] = useState([]);
+  const [showProfDocTypeModal, setShowProfDocTypeModal] = useState(false);
+  const [editingProfDocTypeId, setEditingProfDocTypeId] = useState(null);
+  const [profDocTypeForm, setProfDocTypeForm] = useState({ name: '', description: '', status: true });
+
+  // State for Professional Documents
+  const [showProfDocsModal, setShowProfDocsModal] = useState(false);
+  const [selectedProfForDocs, setSelectedProfForDocs] = useState(null);
+  const [profDocs, setProfDocs] = useState([]);
+  const [docUploadForm, setDocUploadForm] = useState({ profDocTypeId: '', file: null });
+
   const [msgModal, setMsgModal] = useState({ isOpen: false, message: '', type: 'info', onConfirm: null });
 
   const showMsg = (message, type = 'info', onConfirm = null) => {
@@ -32,7 +68,14 @@ const Admin = () => {
   useEffect(() => {
     fetchProfessionals();
     fetchBenefits();
+    fetchTests();
+    fetchTestCategories();
+    fetchProfDocTypes();
   }, []);
+
+  useEffect(() => {
+    setTestPage(1);
+  }, [testSearch, testCategoryFilter]);
 
   // --- Professionals Methods ---
   const fetchProfessionals = async () => {
@@ -158,7 +201,112 @@ const Admin = () => {
     return sortableItems;
   }, [professionals, profSortConfig]);
 
-  // --- Benefits Methods ---
+  
+  // --- Prof Doc Types Methods ---
+  const fetchProfDocTypes = async () => {
+    try {
+      const { data } = await api.get('/prof-doc-types');
+      setProfDocTypes(data);
+    } catch (err) { console.error(err); }
+  };
+
+  const handleProfDocTypeSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingProfDocTypeId) {
+        await api.patch(`/prof-doc-types/${editingProfDocTypeId}`, profDocTypeForm);
+      } else {
+        await api.post('/prof-doc-types', profDocTypeForm);
+      }
+      setShowProfDocTypeModal(false);
+      fetchProfDocTypes();
+    } catch (err) {
+      showMsg(err.response?.data?.error || 'Error al guardar tipo de documento.', 'alert');
+    }
+  };
+
+  const openProfDocTypeModal = (type = null) => {
+    if (type) {
+      setEditingProfDocTypeId(type.id);
+      setProfDocTypeForm({ name: type.name, description: type.description || '', status: type.status });
+    } else {
+      setEditingProfDocTypeId(null);
+      setProfDocTypeForm({ name: '', description: '', status: true });
+    }
+    setShowProfDocTypeModal(true);
+  };
+
+  const handleProfDocTypeDelete = async (id) => {
+    showMsg('¿Estás seguro de que quieres eliminar este tipo de documento?', 'info', async () => {
+      try {
+        await api.delete(`/prof-doc-types/${id}`);
+        fetchProfDocTypes();
+      } catch (err) {
+        showMsg('No se puede eliminar. Puede que haya documentos asociados.', 'alert');
+      }
+    });
+  };
+
+  // --- Prof Documents Methods ---
+  const openProfDocsModal = async (prof) => {
+    setSelectedProfForDocs(prof);
+    setDocUploadForm({ profDocTypeId: '', file: null });
+    await fetchProfDocs(prof.id);
+    setShowProfDocsModal(true);
+  };
+
+  const fetchProfDocs = async (profId) => {
+    try {
+      const { data } = await api.get(`/professionals/${profId}/documents`);
+      setProfDocs(data);
+    } catch (err) { console.error(err); }
+  };
+
+  const handleDocUpload = async (e) => {
+    e.preventDefault();
+    if (!docUploadForm.file || !docUploadForm.profDocTypeId) return;
+    
+    const formData = new FormData();
+    formData.append('file', docUploadForm.file);
+    formData.append('profDocTypeId', docUploadForm.profDocTypeId);
+
+    try {
+      await api.post(`/professionals/${selectedProfForDocs.id}/documents`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setDocUploadForm({ profDocTypeId: '', file: null });
+      fetchProfDocs(selectedProfForDocs.id);
+    } catch (err) {
+      showMsg('Error al subir el documento', 'alert');
+    }
+  };
+
+  const handleDocDelete = (docId) => {
+    showMsg('¿Seguro de eliminar este documento?', 'alert', async () => {
+      try {
+        await api.delete(`/professionals/${selectedProfForDocs.id}/documents/${docId}`);
+        setProfDocs(profDocs.filter(d => d.id !== docId));
+      } catch (err) {
+        showMsg('Error al eliminar', 'alert');
+      }
+    });
+  };
+
+  const handleDownload = (doc) => {
+    try {
+      const a = document.createElement('a');
+      a.href = doc.fileUrl;
+      a.download = doc.originalName || 'documento';
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      showMsg('Error al intentar descargar el documento.', 'alert');
+    }
+  };
+
+// --- Benefits Methods ---
   const fetchBenefits = async () => {
     try {
       const { data } = await api.get('/benefits');
@@ -247,6 +395,146 @@ const Admin = () => {
     setProfForm({ ...profForm, benefitIds: currentIds });
   };
 
+  // --- Tests Methods ---
+  const fetchTests = async () => {
+    setIsLoadingTests(true);
+    try {
+      const { data } = await api.get('/tests');
+      setTests(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoadingTests(false);
+    }
+  };
+
+  const fetchTestCategories = async () => {
+    try {
+      const { data } = await api.get('/tests/categories');
+      setTestCategories(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleTestSubmit = async (e) => {
+    e.preventDefault();
+    const finalCategory = testForm.isNewCat ? testForm.customCategory.trim() : testForm.category.trim();
+    if (!testForm.name.trim()) {
+      showMsg('El nombre de la prueba es requerido.', 'alert');
+      return;
+    }
+    if (!finalCategory) {
+      showMsg('La categoría de la prueba es requerida.', 'alert');
+      return;
+    }
+
+    const payload = {
+      name: testForm.name.trim(),
+      category: finalCategory,
+      description: testForm.description ? testForm.description.trim() : '',
+      active: testForm.active
+    };
+
+    try {
+      if (editingTestId) {
+        await api.patch(`/tests/${editingTestId}`, payload);
+      } else {
+        await api.post('/tests', payload);
+      }
+      setShowTestModal(false);
+      fetchTests();
+      fetchTestCategories();
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Error al guardar la prueba.';
+      showMsg(msg, 'alert');
+    }
+  };
+
+  const openTestModal = (test = null) => {
+    if (test) {
+      setEditingTestId(test.id);
+      setTestForm({
+        name: test.name,
+        category: test.category,
+        customCategory: '',
+        description: test.description || '',
+        active: test.active !== undefined ? test.active : true,
+        isNewCat: false
+      });
+    } else {
+      setEditingTestId(null);
+      setTestForm({
+        name: '',
+        category: testCategories.length > 0 ? testCategories[0] : '',
+        customCategory: '',
+        description: '',
+        active: true,
+        isNewCat: false
+      });
+    }
+    setShowTestModal(true);
+  };
+
+  const handleTestDelete = async (id) => {
+    showMsg(
+      '¿Estás seguro de que quieres eliminar esta prueba? Esta acción no se puede deshacer.',
+      'info',
+      async () => {
+        try {
+          await api.delete(`/tests/${id}`);
+          fetchTests();
+          fetchTestCategories();
+        } catch (err) {
+          const msg = err.response?.data?.error || 'Error al eliminar la prueba.';
+          showMsg(msg, 'alert');
+        }
+      }
+    );
+  };
+
+  const handleTestSort = (key) => {
+    let direction = 'asc';
+    if (testSortConfig.key === key && testSortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setTestSortConfig({ key, direction });
+  };
+
+  const filteredSortedTests = useMemo(() => {
+    let result = [...tests];
+
+    if (testCategoryFilter && testCategoryFilter !== 'ALL') {
+      result = result.filter(t => t.category === testCategoryFilter);
+    }
+
+    if (testSearch && testSearch.trim()) {
+      const q = testSearch.toLowerCase().trim();
+      result = result.filter(t => 
+        (t.name && t.name.toLowerCase().includes(q)) || 
+        (t.description && t.description.toLowerCase().includes(q))
+      );
+    }
+
+    if (testSortConfig.key !== null) {
+      result.sort((a, b) => {
+        const valA = (a[testSortConfig.key] || '').toString().toLowerCase();
+        const valB = (b[testSortConfig.key] || '').toString().toLowerCase();
+        if (valA < valB) return testSortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return testSortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [tests, testCategoryFilter, testSearch, testSortConfig]);
+
+  const totalTestPages = Math.max(1, Math.ceil(filteredSortedTests.length / testItemsPerPage));
+  const paginatedTests = useMemo(() => {
+    const startIndex = (testPage - 1) * testItemsPerPage;
+    return filteredSortedTests.slice(startIndex, startIndex + testItemsPerPage);
+  }, [filteredSortedTests, testPage, testItemsPerPage]);
+
   return (
     <div>
       <h1 style={{ marginBottom: '2rem' }}>Panel de Administración</h1>
@@ -277,6 +565,32 @@ const Admin = () => {
         >
           <Settings size={18} /> Prestaciones
         </button>
+        <button 
+          className={`btn ${activeTab === 'profDocTypes' ? 'btn-primary' : ''}`} 
+          style={{ 
+            display: 'flex', alignItems: 'center', gap: '8px', 
+            background: activeTab === 'profDocTypes' ? 'var(--primary)' : 'transparent', 
+            color: activeTab === 'profDocTypes' ? 'white' : 'var(--dark)',
+            border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer'
+          }}
+          onClick={() => setActiveTab('profDocTypes')}
+        >
+          <FileText size={18} /> Tipos Doc. Prof.
+        </button>
+
+        <button 
+          className={`btn ${activeTab === 'tests' ? 'btn-primary' : ''}`} 
+          style={{ 
+            display: 'flex', alignItems: 'center', gap: '8px', 
+            background: activeTab === 'tests' ? 'var(--primary)' : 'transparent', 
+            color: activeTab === 'tests' ? 'white' : 'var(--dark)',
+            border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer'
+          }}
+          onClick={() => setActiveTab('tests')}
+        >
+          <ClipboardList size={18} /> Catálogo de Pruebas
+        </button>
+
         <button 
           className={`btn ${activeTab === 'archive' ? 'btn-primary' : ''}`} 
           style={{ 
@@ -367,6 +681,9 @@ const Admin = () => {
                         <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => openProfModal(p)}>
                           <Edit3 size={18} color="var(--salmon)" />
                         </button>
+                        <button className="btn" title="Documentos" style={{ padding: '6px', background: 'transparent' }} onClick={() => openProfDocsModal(p)}>
+                          <File size={18} color="#95a5a6" />
+                        </button>
                         <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => handleProfDelete(p.id)}>
                           <Trash2 size={18} color="#e74c3c" />
                         </button>
@@ -443,6 +760,56 @@ const Admin = () => {
           </div>
         )}
 
+        
+        {/* Prof Doc Types Tab */}
+        {activeTab === 'profDocTypes' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <h2>Tipos de Documento para Profesionales</h2>
+              <button className="btn btn-primary" onClick={() => openProfDocTypeModal()}>
+                <Plus size={18} /> Nuevo Tipo
+              </button>
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--soft-gray)' }}>
+                  <th style={{ padding: '1rem' }}>Nombre</th>
+                  <th style={{ padding: '1rem' }}>Descripción</th>
+                  <th style={{ padding: '1rem' }}>Estado</th>
+                  <th style={{ padding: '1rem' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {profDocTypes.map(t => (
+                  <tr key={t.id} style={{ borderBottom: '1px solid var(--soft-gray)' }}>
+                    <td style={{ padding: '1rem', fontWeight: 'bold' }}>{t.name}</td>
+                    <td style={{ padding: '1rem' }}>{t.description}</td>
+                    <td style={{ padding: '1rem' }}>
+                      <span style={{ 
+                        background: t.status ? '#e3f2fd' : '#ffebee', 
+                        color: t.status ? '#1976d2' : '#c62828', 
+                        padding: '4px 8px', borderRadius: '12px', fontSize: '0.8rem' 
+                      }}>
+                        {t.status ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => openProfDocTypeModal(t)}>
+                          <Edit3 size={18} color="var(--salmon)" />
+                        </button>
+                        <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => handleProfDocTypeDelete(t.id)}>
+                          <Trash2 size={18} color="#e74c3c" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Archive Tab (NEW) */}
         {activeTab === 'archive' && (
           <div style={{ padding: '2rem 1rem', textAlign: 'center' }}>
@@ -503,6 +870,270 @@ const Admin = () => {
                 El archivo se llamará: buketkumeYYYYMMDDHHMM.zip
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Tests Tab */}
+        {activeTab === 'tests' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  Catálogo de Pruebas
+                  <span style={{ fontSize: '0.85rem', fontWeight: 'normal', background: '#eef2f6', color: '#555', padding: '4px 10px', borderRadius: '12px' }}>
+                    {filteredSortedTests.length} {filteredSortedTests.length === 1 ? 'prueba' : 'pruebas'}
+                  </span>
+                </h2>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#666' }}>
+                  Pruebas y técnicas diagnósticas disponibles para evaluación por los profesionales.
+                </p>
+              </div>
+              <button className="btn btn-primary" onClick={() => openTestModal()}>
+                <Plus size={18} /> Nueva Prueba
+              </button>
+            </div>
+
+            {/* Filters Bar */}
+            <div style={{ 
+              display: 'flex', 
+              gap: '12px', 
+              marginBottom: '1.5rem', 
+              flexWrap: 'wrap', 
+              alignItems: 'center',
+              backgroundColor: '#f8fafc',
+              padding: '12px 16px',
+              borderRadius: '10px',
+              border: '1px solid #e2e8f0'
+            }}>
+              <div style={{ position: 'relative', flex: '1 1 250px' }}>
+                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input 
+                  type="text"
+                  placeholder="Buscar por técnica o descripción..."
+                  value={testSearch}
+                  onChange={e => setTestSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px 8px 36px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.9rem',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div style={{ flex: '1 1 200px' }}>
+                <select 
+                  value={testCategoryFilter}
+                  onChange={e => setTestCategoryFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.9rem',
+                    background: 'white',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <option value="ALL">Todas las categorías ({tests.length})</option>
+                  {testCategories.map(cat => {
+                    const count = tests.filter(t => t.category === cat).length;
+                    return (
+                      <option key={cat} value={cat}>
+                        {cat} ({count})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {(testSearch || testCategoryFilter !== 'ALL') && (
+                <button 
+                  className="btn"
+                  onClick={() => { setTestSearch(''); setTestCategoryFilter('ALL'); }}
+                  style={{ padding: '8px 14px', fontSize: '0.85rem', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+                >
+                  Limpiar filtros
+                </button>
+              )}
+
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#64748b' }}>
+                <span>Mostrar:</span>
+                <select
+                  value={testItemsPerPage}
+                  onChange={e => { setTestItemsPerPage(Number(e.target.value)); setTestPage(1); }}
+                  style={{ padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem' }}
+                >
+                  <option value={15}>15</option>
+                  <option value={30}>30</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Tests Table */}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--soft-gray)' }}>
+                    <th 
+                      style={{ padding: '1rem', cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleTestSort('name')}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        Técnica / Prueba
+                        {testSortConfig.key === 'name' && (
+                          testSortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                        )}
+                      </div>
+                    </th>
+                    <th 
+                      style={{ padding: '1rem', cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleTestSort('category')}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        Categoría
+                        {testSortConfig.key === 'category' && (
+                          testSortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                        )}
+                      </div>
+                    </th>
+                    <th style={{ padding: '1rem' }}>Descripción</th>
+                    <th style={{ padding: '1rem', width: '90px' }}>Estado</th>
+                    <th style={{ padding: '1rem', width: '100px' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoadingTests ? (
+                    <tr>
+                      <td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
+                        Cargando pruebas...
+                      </td>
+                    </tr>
+                  ) : paginatedTests.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
+                        No se encontraron pruebas que coincidan con los criterios.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedTests.map(t => (
+                      <tr key={t.id} style={{ borderBottom: '1px solid var(--soft-gray)' }}>
+                        <td style={{ padding: '1rem', fontWeight: '600', color: 'var(--dark-text)' }}>
+                          {t.name}
+                        </td>
+                        <td style={{ padding: '1rem' }}>
+                          <span style={{
+                            background: '#f1f5f9',
+                            color: '#334155',
+                            padding: '4px 10px',
+                            borderRadius: '12px',
+                            fontSize: '0.8rem',
+                            fontWeight: '500',
+                            border: '1px solid #e2e8f0',
+                            display: 'inline-block'
+                          }}>
+                            {t.category}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.85rem', color: '#64748b' }}>
+                          {t.description || <span style={{ color: '#cbd5e1' }}>—</span>}
+                        </td>
+                        <td style={{ padding: '1rem' }}>
+                          <span style={{
+                            fontSize: '0.75rem',
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            background: t.active ? '#dcfce7' : '#fee2e2',
+                            color: t.active ? '#15803d' : '#b91c1c'
+                          }}>
+                            {t.active ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem' }}>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button 
+                              className="btn" 
+                              style={{ padding: '6px', background: 'transparent' }} 
+                              onClick={() => openTestModal(t)}
+                              title="Editar prueba"
+                            >
+                              <Edit3 size={18} color="var(--salmon)" />
+                            </button>
+                            <button 
+                              className="btn" 
+                              style={{ padding: '6px', background: 'transparent' }} 
+                              onClick={() => handleTestDelete(t.id)}
+                              title="Eliminar prueba"
+                            >
+                              <Trash2 size={18} color="#e74c3c" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            {filteredSortedTests.length > 0 && (
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                padding: '1rem 0 0 0', 
+                marginTop: '1rem', 
+                borderTop: '1px solid #f1f5f9',
+                flexWrap: 'wrap',
+                gap: '10px'
+              }}>
+                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                  Mostrando {((testPage - 1) * testItemsPerPage) + 1} - {Math.min(testPage * testItemsPerPage, filteredSortedTests.length)} de {filteredSortedTests.length} pruebas
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    className="btn"
+                    disabled={testPage <= 1}
+                    onClick={() => setTestPage(prev => Math.max(prev - 1, 1))}
+                    style={{
+                      padding: '6px 10px',
+                      background: testPage <= 1 ? '#f1f5f9' : 'white',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '6px',
+                      cursor: testPage <= 1 ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <ChevronLeft size={16} color={testPage <= 1 ? '#94a3b8' : '#334155'} />
+                  </button>
+                  <span style={{ fontSize: '0.85rem', fontWeight: '500', color: '#334155' }}>
+                    Página {testPage} de {totalTestPages}
+                  </span>
+                  <button
+                    className="btn"
+                    disabled={testPage >= totalTestPages}
+                    onClick={() => setTestPage(prev => Math.min(prev + 1, totalTestPages))}
+                    style={{
+                      padding: '6px 10px',
+                      background: testPage >= totalTestPages ? '#f1f5f9' : 'white',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '6px',
+                      cursor: testPage >= totalTestPages ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <ChevronRight size={16} color={testPage >= totalTestPages ? '#94a3b8' : '#334155'} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -629,6 +1260,324 @@ const Admin = () => {
               </div>
               <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Guardar</button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showTestModal && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '480px', position: 'relative' }}>
+            <button onClick={() => setShowTestModal(false)} style={{ position: 'absolute', right: '15px', top: '15px', background: 'transparent', border: 'none', cursor: 'pointer' }}><X /></button>
+            <h2>{editingTestId ? 'Editar Prueba' : 'Nueva Prueba'}</h2>
+            <form onSubmit={handleTestSubmit} style={{ marginTop: '1.2rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>Técnica / Nombre de la Prueba</label>
+                <input 
+                  type="text" 
+                  required 
+                  className="form-control" 
+                  placeholder="Ej. WISC-V, ADOS-2, D2..."
+                  style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }} 
+                  value={testForm.name} 
+                  onChange={e => setTestForm({ ...testForm, name: e.target.value })} 
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontWeight: '500' }}>Categoría</label>
+                  <button
+                    type="button"
+                    onClick={() => setTestForm({ ...testForm, isNewCat: !testForm.isNewCat })}
+                    style={{ background: 'none', border: 'none', color: 'var(--salmon)', fontSize: '0.8rem', cursor: 'pointer', padding: 0 }}
+                  >
+                    {testForm.isNewCat ? '← Elegir existente' : '+ Nueva categoría'}
+                  </button>
+                </div>
+                {testForm.isNewCat ? (
+                  <input 
+                    type="text" 
+                    required 
+                    className="form-control" 
+                    placeholder="Nombre de la nueva categoría..."
+                    style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }} 
+                    value={testForm.customCategory} 
+                    onChange={e => setTestForm({ ...testForm, customCategory: e.target.value })} 
+                  />
+                ) : (
+                  <select 
+                    required 
+                    className="form-control" 
+                    style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #ddd', background: 'white', boxSizing: 'border-box' }} 
+                    value={testForm.category} 
+                    onChange={e => setTestForm({ ...testForm, category: e.target.value })}
+                  >
+                    <option value="" disabled>Seleccione una categoría</option>
+                    {testCategories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>Descripción / Observaciones (opcional)</label>
+                <textarea 
+                  rows={3}
+                  className="form-control" 
+                  placeholder="Detalles sobre aplicación, edad o requisitos..."
+                  style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }} 
+                  value={testForm.description} 
+                  onChange={e => setTestForm({ ...testForm, description: e.target.value })} 
+                />
+              </div>
+
+              <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input 
+                  type="checkbox" 
+                  id="testActive"
+                  checked={testForm.active} 
+                  onChange={e => setTestForm({ ...testForm, active: e.target.checked })} 
+                />
+                <label htmlFor="testActive" style={{ cursor: 'pointer', fontSize: '0.9rem' }}>Prueba activa en el sistema</label>
+              </div>
+
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '10px' }}>
+                {editingTestId ? 'Guardar Cambios' : 'Crear Prueba'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      
+      {/* Prof Doc Type Modal */}
+      {showProfDocTypeModal && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '400px', position: 'relative' }}>
+            <button onClick={() => setShowProfDocTypeModal(false)} style={{ position: 'absolute', right: '15px', top: '15px', background: 'transparent', border: 'none', cursor: 'pointer' }}><X /></button>
+            <h2>{editingProfDocTypeId ? 'Editar Tipo de Documento' : 'Nuevo Tipo de Documento'}</h2>
+            <form onSubmit={handleProfDocTypeSubmit} style={{ marginTop: '1rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label>Nombre del Documento</label>
+                <input type="text" required className="form-control" style={{ width: '100%', padding: '8px', borderRadius:'8px', border:'1px solid #ddd'}} value={profDocTypeForm.name} onChange={e => setProfDocTypeForm({...profDocTypeForm, name: e.target.value})} />
+              </div>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label>Descripción</label>
+                <textarea className="form-control" style={{ width: '100%', padding: '8px', borderRadius:'8px', border:'1px solid #ddd'}} value={profDocTypeForm.description} onChange={e => setProfDocTypeForm({...profDocTypeForm, description: e.target.value})} />
+              </div>
+              <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input 
+                  type="checkbox" 
+                  id="docStatus"
+                  checked={profDocTypeForm.status} 
+                  onChange={e => setProfDocTypeForm({...profDocTypeForm, status: e.target.checked})} 
+                />
+                <label htmlFor="docStatus" style={{ cursor: 'pointer', fontSize: '0.9rem' }}>Activo</label>
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Guardar</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Professional Documents Modal */}
+      {showProfDocsModal && selectedProfForDocs && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '600px', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+            <button onClick={() => setShowProfDocsModal(false)} style={{ position: 'absolute', right: '15px', top: '15px', background: 'transparent', border: 'none', cursor: 'pointer' }}><X /></button>
+            <h2>Documentos de {selectedProfForDocs.firstName} {selectedProfForDocs.lastName}</h2>
+            
+            <form onSubmit={handleDocUpload} style={{ marginTop: '1rem', background: '#f8f9fa', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+              <h4 style={{ margin: '0 0 10px 0' }}>Subir Nuevo Documento</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignItems: 'end' }}>
+                <div>
+                  <label style={{ fontSize: '0.9rem' }}>Tipo de Documento</label>
+                  <select 
+                    required 
+                    className="form-control" 
+                    style={{ width: '100%', padding: '8px', borderRadius:'8px', border:'1px solid #ddd', background: 'white'}} 
+                    value={docUploadForm.profDocTypeId} 
+                    onChange={e => setDocUploadForm({...docUploadForm, profDocTypeId: e.target.value})}
+                  >
+                    <option value="">Seleccionar...</option>
+                    {profDocTypes.filter(t => t.status).map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.9rem' }}>Archivo</label>
+                  <input 
+                    type="file" 
+                    required 
+                    className="form-control" 
+                    style={{ width: '100%', padding: '5px', borderRadius:'8px', border:'1px solid #ddd', background: 'white'}} 
+                    onChange={e => setDocUploadForm({...docUploadForm, file: e.target.files[0]})} 
+                  />
+                </div>
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                <Upload size={16} /> Subir Documento
+              </button>
+            </form>
+
+            <h4>Documentos Subidos</h4>
+            {profDocs.length === 0 ? (
+              <p style={{ color: '#666', fontSize: '0.9rem' }}>No hay documentos subidos.</p>
+            ) : (
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {profDocs.map(doc => (
+                  <li key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderBottom: '1px solid #eee' }}>
+                    <div>
+                      <strong>{doc.ProfDocType?.name}</strong>
+                      <div style={{ fontSize: '0.8rem', color: '#666' }}>{doc.originalName}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                        className="btn" 
+                        style={{ padding: '6px', color: '#1976d2', background: 'transparent', border: '1px solid #1976d2', borderRadius: '4px' }} 
+                        onClick={() => setShowingDoc(doc)}
+                      >
+                        Ver
+                      </button>
+                      <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => handleDocDelete(doc.id)}>
+                        <Trash2 size={18} color="#e74c3c" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Document Viewer Modal */}
+      {showingDoc && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', flexDirection: 'column', 
+          justifyContent: 'center', alignItems: 'center', zIndex: 1100, backdropFilter: 'blur(6px)'
+        }}>
+          <div style={{ 
+            backgroundColor: 'white', 
+            width: isDocMaximized ? '100%' : '90%', 
+            maxWidth: isDocMaximized ? '100%' : '1000px', 
+            height: isDocMaximized ? '100%' : '85vh', 
+            borderRadius: isDocMaximized ? '0' : '16px', 
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+            transition: 'all 0.3s ease'
+          }}>
+            <div style={{ 
+              padding: '0.8rem 1.5rem', borderBottom: '1px solid #eee', display: 'flex', 
+              justifyContent: 'space-between', alignItems: 'center', background: '#fcfcfc'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>
+                {showingDoc.originalName}
+              </h3>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                {showingDoc.fileUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/) && (
+                  <div style={{ display: 'flex', gap: '5px', marginRight: '10px', paddingRight: '10px', borderRight: '1px solid #ddd' }}>
+                    <button 
+                      onClick={() => setImgZoom(prev => Math.min(prev + 0.25, 3))}
+                      style={{ background: '#f0f0f0', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#555' }}
+                      title="Acercar"
+                    >
+                      <ZoomIn size={18} />
+                    </button>
+                    <button 
+                      onClick={() => setImgZoom(prev => Math.max(prev - 0.25, 0.5))}
+                      style={{ background: '#f0f0f0', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#555' }}
+                      title="Alejar"
+                    >
+                      <ZoomOut size={18} />
+                    </button>
+                    <button 
+                      onClick={() => setImgRotation(prev => (prev + 90) % 360)}
+                      style={{ background: '#f0f0f0', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#555' }}
+                      title="Rotar"
+                    >
+                      <RotateCw size={18} />
+                    </button>
+                  </div>
+                )}
+                <button 
+                  className="btn btn-primary" 
+                  onClick={() => handleDownload(showingDoc)}
+                  style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+                >
+                  Descargar
+                </button>
+                
+                <button 
+                  onClick={() => setIsDocMaximized(!isDocMaximized)}
+                  style={{ background: '#f0f0f0', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#555' }}
+                  title={isDocMaximized ? "Achicar" : "Maximizar"}
+                >
+                  {isDocMaximized ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                </button>
+
+                <button 
+                  onClick={() => { setShowingDoc(null); setIsDocMaximized(false); setImgZoom(1); setImgRotation(0); }}
+                  style={{ background: '#fee2e2', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#ef4444' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, backgroundColor: '#525659', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'auto', position: 'relative' }}>
+              {(() => {
+                const previewUrl = showingDoc.fileUrl;
+                
+                if (showingDoc.fileUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/)) {
+                  return <img 
+                    src={previewUrl} 
+                    alt={showingDoc.originalName} 
+                    style={{ 
+                      maxWidth: imgZoom === 1 ? '100%' : 'none', 
+                      maxHeight: imgZoom === 1 ? '100%' : 'none', 
+                      objectFit: 'contain',
+                      transform: `scale(${imgZoom}) rotate(${imgRotation}deg)`,
+                      transition: 'transform 0.2s ease-in-out'
+                    }} 
+                  />;
+                } 
+                
+                if (showingDoc.fileUrl.toLowerCase().endsWith('.pdf')) {
+                  return (
+                    <iframe 
+                      src={previewUrl} 
+                      style={{ width: '100%', height: '100%', border: 'none' }} 
+                      title="PDF Preview"
+                    />
+                  );
+                } 
+
+                return <div style={{ textAlign: 'center', padding: '3rem', color: 'white' }}>
+                    <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📄</div>
+                    <p style={{ fontSize: '1.1rem' }}>Vista previa no disponible para este tipo de archivo.</p>
+                    <button 
+                      className="btn btn-primary" 
+                      onClick={() => handleDownload(showingDoc)}
+                      style={{ marginTop: '1.5rem' }}
+                    >
+                      Descargar para ver
+                    </button>
+                  </div>;
+              })()}
+            </div>
           </div>
         </div>
       )}
