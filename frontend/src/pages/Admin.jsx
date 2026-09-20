@@ -294,8 +294,9 @@ const Admin = () => {
 
   const handleDownload = (doc) => {
     try {
+      const downloadUrl = `${api.defaults.baseURL}/professionals/documents/${doc.id}/view?token=${localStorage.getItem('token')}`;
       const a = document.createElement('a');
-      a.href = doc.fileUrl;
+      a.href = downloadUrl;
       a.download = doc.originalName || 'documento';
       a.target = '_blank';
       document.body.appendChild(a);
@@ -1539,7 +1540,7 @@ const Admin = () => {
 
             <div style={{ flex: 1, backgroundColor: '#525659', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'auto', position: 'relative' }}>
               {(() => {
-                const previewUrl = showingDoc.fileUrl;
+                const previewUrl = `${api.defaults.baseURL}/professionals/documents/${showingDoc.id}/view?token=${localStorage.getItem('token')}`;
                 
                 if (showingDoc.fileUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/)) {
                   return <img 
