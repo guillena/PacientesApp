@@ -62,6 +62,9 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
+// Suppress favicon 404 (browsers always request this)
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
 // Global Error Handler
 app.use((err, req, res, next) => {
   console.error('GLOBAL ERROR:', err);
