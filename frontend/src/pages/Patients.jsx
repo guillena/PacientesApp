@@ -775,6 +775,7 @@ const Patients = () => {
                           <QrCode size={15} /> QR
                         </button>
                       </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'end' }}>
                           <div>
                             <label style={{ fontSize: '0.9rem', display: 'block', marginBottom: '4px' }}>Archivo</label>
