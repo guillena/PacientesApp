@@ -234,9 +234,9 @@ const serveMobilePage = async (req, res) => {
     }
 
     function showCamera() {
-      video.style.display = '';
+      video.style.display = 'block';
       photoPreview.style.display = 'none';
-      captureBtn.style.display = '';
+      captureBtn.style.display = 'flex';
       retakeBtn.style.display = 'none';
       uploadBtn.style.display = 'none';
       capturedBlob = null;
@@ -257,8 +257,8 @@ const serveMobilePage = async (req, res) => {
         photoPreview.style.display = 'block';
         video.style.display = 'none';
         captureBtn.style.display = 'none';
-        retakeBtn.style.display = '';
-        uploadBtn.style.display = '';
+        retakeBtn.style.display = 'flex';
+        uploadBtn.style.display = 'flex';
         status.textContent = '¿Se ve bien? Podés retomar o subir la foto.';
       }, 'image/jpeg', 0.92);
     });
