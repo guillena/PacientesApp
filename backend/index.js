@@ -50,8 +50,11 @@ app.use('/api/tests', testRoutes);
 app.use('/api/prof-doc-types', profDocTypeRoutes);
 
 // Mobile QR photo upload routes (public-ish, secured by short-lived JWT in query string)
+// Uses a simple memory-storage multer to avoid issues with the complex shared upload middleware
+const multerMemory = require('multer')({ storage: require('multer').memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 app.get('/mobile-photo', serveMobilePage);
-app.post('/mobile-photo/upload', upload.single('file'), handleMobilePhotoUpload);
+app.post('/mobile-photo/upload', multerMemory.single('file'), handleMobilePhotoUpload);
+
 
 
 // Basic Route

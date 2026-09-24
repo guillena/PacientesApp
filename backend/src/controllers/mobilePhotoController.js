@@ -334,10 +334,12 @@ const serveMobilePage = async (req, res) => {
 
 /**
  * POST /mobile-photo/upload
- * Receives the photo, validates the temp token, saves to S3 / local storage
+ * Receives the photo (memory storage buffer), validates the temp token, saves to S3 / local disk
  */
 const handleMobilePhotoUpload = async (req, res) => {
   try {
+    console.log('[MobileUpload] Request received. token present:', !!req.query.token, 'file present:', !!req.file);
+
     const { token } = req.query;
     if (!token) return res.status(400).send({ error: 'Token requerido' });
 
@@ -363,11 +365,45 @@ const handleMobilePhotoUpload = async (req, res) => {
     if (!prof) return res.status(404).send({ error: 'Profesional no encontrado' });
 
     const folderName = username || prof.username;
-    const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
-    const fileUrl = req.file.location || `${baseUrl}/uploads/profesionales/${folderName}/${req.file.filename}`;
-
-    // Fix filename encoding
+    const fileName = `${Date.now()}-${req.file.originalname}`;
     const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+
+    let fileUrl;
+    const bucketName = process.env.BUCKET_NAME || process.env.BUCKET;
+
+    if (bucketName) {
+      // --- S3 Upload ---
+      const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+      const s3 = new S3Client({
+        region: process.env.REGION || 'us-east-1',
+        endpoint: process.env.ENDPOINT,
+        credentials: {
+          accessKeyId: process.env.ACCESS_KEY_ID,
+          secretAccessKey: process.env.SECRET_ACCESS_KEY,
+        },
+        forcePathStyle: true,
+      });
+
+      const s3Key = `profesionales/${folderName}/${fileName}`;
+      await s3.send(new PutObjectCommand({
+        Bucket: bucketName,
+        Key: s3Key,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype || 'image/jpeg',
+      }));
+
+      fileUrl = `${process.env.ENDPOINT}/${bucketName}/${s3Key}`;
+    } else {
+      // --- Local disk save ---
+      const fs = require('fs');
+      const path = require('path');
+      const uploadDir = path.join(__dirname, '../../uploads', 'profesionales', folderName);
+      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+      const filePath = path.join(uploadDir, fileName);
+      fs.writeFileSync(filePath, req.file.buffer);
+      const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
+      fileUrl = `${baseUrl}/uploads/profesionales/${folderName}/${fileName}`;
+    }
 
     // Find or create a "Foto" doc type for mobile uploads
     let [photoDocType] = await ProfDocType.findOrCreate({
@@ -385,14 +421,14 @@ const handleMobilePhotoUpload = async (req, res) => {
 
     const fullDoc = await ProfessionalDocument.findByPk(doc.id, { include: [ProfDocType] });
 
-    // Mark token as used
+    // Mark token as used (single-use within validity window)
     usedTokens.add(token);
-    // Clean up old tokens from memory after 15 min
     setTimeout(() => usedTokens.delete(token), 15 * 60 * 1000);
 
+    console.log('[MobileUpload] Success! Document id:', doc.id, 'fileUrl:', fileUrl);
     res.status(201).send(fullDoc);
   } catch (e) {
-    console.error('Mobile photo upload error:', e);
+    console.error('[MobileUpload] ERROR:', e);
     res.status(500).send({ error: e.message });
   }
 };
