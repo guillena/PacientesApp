@@ -1,8 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { Professional, ProfessionalDocument, ProfDocType } = require('../models');
 
-// In-memory set to track used tokens (single-use per session, cleared on restart)
-const usedTokens = new Set();
 
 /**
  * POST /api/professionals/:professionalId/photo-token
@@ -315,9 +313,6 @@ const handleMobilePhotoUpload = async (req, res) => {
     const { token } = req.query;
     if (!token) return res.status(400).send({ error: 'Token requerido' });
 
-    if (usedTokens.has(token)) {
-      return res.status(401).send({ error: 'Este enlace ya fue utilizado. Pedí un nuevo QR.' });
-    }
 
     let decoded;
     try {
@@ -386,9 +381,6 @@ const handleMobilePhotoUpload = async (req, res) => {
     });
 
     const fullDoc = await ProfessionalDocument.findByPk(doc.id, { include: [ProfDocType] });
-
-    usedTokens.add(token);
-    setTimeout(() => usedTokens.delete(token), 15 * 60 * 1000);
 
     console.log('[MobileUpload] Success! Document id:', doc.id);
     res.status(201).send(fullDoc);
