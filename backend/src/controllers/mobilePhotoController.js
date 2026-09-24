@@ -247,8 +247,8 @@ const serveMobilePage = async (req, res) => {
     const status       = document.getElementById('status');
     let selectedFile   = null;
 
-    cameraBtn.addEventListener('click', () => fileInput.click());
-    retakeBtn.addEventListener('click', () => fileInput.click());
+    cameraBtn.addEventListener('click', () => { fileInput.value = ''; fileInput.click(); });
+    retakeBtn.addEventListener('click', () => { fileInput.value = ''; fileInput.click(); });
 
     fileInput.addEventListener('change', () => {
       const file = fileInput.files[0];
@@ -262,7 +262,10 @@ const serveMobilePage = async (req, res) => {
 
       cameraBtn.style.display = 'none';
       retakeBtn.style.display = 'flex';
+      retakeBtn.textContent = '↩ Otra foto';
+      retakeBtn.disabled = false;
       uploadBtn.style.display = 'flex';
+      uploadBtn.disabled = false;
       status.textContent = '¿Se ve bien? Podés sacar otra o subir la foto.';
       status.className = '';
     });
@@ -285,6 +288,7 @@ const serveMobilePage = async (req, res) => {
           status.className = 'success';
           photoPreview.style.opacity = '0.5';
           uploadBtn.style.display = 'none';
+          uploadBtn.disabled = false;
           retakeBtn.textContent = '+ Subir otra';
           retakeBtn.disabled = false;
         } else {
