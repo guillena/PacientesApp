@@ -999,6 +999,9 @@ const Patients = () => {
               <tr key={p.id} style={{ borderBottom: '1px solid var(--soft-gray)', transition: 'background 0.2s' }}>
                 <td style={{ padding: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
                   {p.lastName}, {p.firstName}
+                  {p.PatientDocuments && p.PatientDocuments.length > 0 && (
+                    <FileText size={16} color="#666" style={{ flexShrink: 0, marginLeft: '4px' }} title="Tiene documentos" />
+                  )}
                   {p.isInactive && <span style={{ fontSize: '0.7rem', backgroundColor: '#fee2e2', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', border: '1px solid #fca5a5' }}>INACTIVO</span>}
                 </td>
                 <td style={{ padding: '1rem' }}>
@@ -1078,7 +1081,12 @@ const Patients = () => {
                   INACTIVO
                 </span>
               )}
-              <h3 style={{ margin: '0 0 1rem 0', paddingRight: '60px', color: 'var(--dark-text)' }}>{p.lastName}, {p.firstName}</h3>
+              <h3 style={{ margin: '0 0 1rem 0', paddingRight: '60px', color: 'var(--dark-text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {p.lastName}, {p.firstName}
+                {p.PatientDocuments && p.PatientDocuments.length > 0 && (
+                  <FileText size={18} color="#666" style={{ flexShrink: 0 }} title="Tiene documentos" />
+                )}
+              </h3>
               
               <div style={{ marginBottom: '1.2rem', flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: '#555', fontSize: '0.9rem' }}>

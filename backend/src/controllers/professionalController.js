@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { Professional, Benefit } = require('../models');
+const { Professional, Benefit, ProfessionalDocument } = require('../models');
 const archiver = require('archiver');
 const fs = require('fs');
 const path = require('path');
@@ -44,7 +44,7 @@ const getProfessionals = async (req, res) => {
   try {
     const professionals = await Professional.findAll({
       attributes: { exclude: ['password'] },
-      include: [Benefit]
+      include: [Benefit, ProfessionalDocument]
     });
     res.send(professionals);
   } catch (e) {

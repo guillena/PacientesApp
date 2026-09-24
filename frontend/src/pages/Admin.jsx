@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { 
   Plus, Edit3, Trash2, X, Users, Settings, ChevronUp, ChevronDown, 
-  Eye, EyeOff, Folder, Download, ClipboardList, Search, ChevronLeft, ChevronRight, FileText, Upload, File,
+  Eye, EyeOff, Folder, Download, ClipboardList, Search, ChevronLeft, ChevronRight, FileText, Upload, File, FilePlus,
   ZoomIn, ZoomOut, RotateCw, Maximize2, Minimize2
 } from 'lucide-react';
 import MessageModal from '../components/MessageModal';
@@ -658,6 +658,9 @@ const Admin = () => {
                     <td style={{ padding: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div style={{ width: '12px', height: '12px', borderRadius: '50%', flexShrink: 0, backgroundColor: p.role === 'admin' ? '#95a5a6' : (p.color || '#b9d3fd') }}></div>
                       {p.firstName} {p.lastName}
+                      {p.ProfessionalDocuments && p.ProfessionalDocuments.length > 0 && (
+                        <FileText size={16} color="#666" style={{ flexShrink: 0, marginLeft: '4px' }} title="Tiene documentos" />
+                      )}
                     </td>
                     <td style={{ padding: '1rem' }}>{p.username}</td>
                     <td style={{ padding: '1rem' }}>
@@ -683,7 +686,7 @@ const Admin = () => {
                           <Edit3 size={18} color="var(--salmon)" />
                         </button>
                         <button className="btn" title="Documentos" style={{ padding: '6px', background: 'transparent' }} onClick={() => openProfDocsModal(p)}>
-                          <File size={18} color="#95a5a6" />
+                          <FilePlus size={18} color="#95a5a6" />
                         </button>
                         <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => handleProfDelete(p.id)}>
                           <Trash2 size={18} color="#e74c3c" />
