@@ -1503,14 +1503,14 @@ const Patients = () => {
                 {showingDoc.url.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/) && (
                   <div style={{ display: 'flex', gap: '5px', marginRight: '10px', paddingRight: '10px', borderRight: '1px solid #ddd' }}>
                     <button 
-                      onClick={() => setImgZoom(prev => Math.min(prev + 0.25, 3))}
+                      onClick={() => setImgZoom(prev => Math.min(prev + 0.1, 3))}
                       style={{ background: '#f0f0f0', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#555' }}
                       title="Acercar"
                     >
                       <ZoomIn size={18} />
                     </button>
                     <button 
-                      onClick={() => setImgZoom(prev => Math.max(prev - 0.25, 0.5))}
+                      onClick={() => setImgZoom(prev => Math.max(prev - 0.1, 0.5))}
                       style={{ background: '#f0f0f0', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#555' }}
                       title="Alejar"
                     >
