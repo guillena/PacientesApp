@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { Search, UserPlus, Edit3, X, ArrowUpDown, ArrowUp, ArrowDown, Activity, List, Grid, Eye, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCw, FileText, Trash2, Calendar, CheckCircle2, MoreVertical, ClipboardList } from 'lucide-react';
+import { Search, UserPlus, Edit3, X, ArrowUpDown, ArrowUp, ArrowDown, Activity, List, Grid, Eye, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCw, FileText, Trash2, Calendar, CheckCircle2, MoreVertical, ClipboardList, Upload, Mic, MicOff } from 'lucide-react';
 import MessageModal from '../components/MessageModal';
 import { useAuth } from '../store/AuthContext';
 
@@ -97,11 +97,12 @@ const Patients = () => {
   // Tabs and Documents state
   const [activeTab, setActiveTab] = useState('personal');
   const [patientDocs, setPatientDocs] = useState([]);
+  const getLocalDate = () => new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
 
   // Tests state
   const [patientTests, setPatientTests] = useState([]);
   const [availableTests, setAvailableTests] = useState([]);
-  const [newTest, setNewTest] = useState({ testId: '', date: new Date().toISOString().split('T')[0] });
+  const [newTest, setNewTest] = useState({ testId: '', date: getLocalDate() });
   const [isLoadingTests, setIsLoadingTests] = useState(false);
   const [testSearchQuery, setTestSearchQuery] = useState('');
 
@@ -115,6 +116,7 @@ const Patients = () => {
   const [imgZoom, setImgZoom] = useState(1);
   const [imgRotation, setImgRotation] = useState(0);
   const [isConformityChecked, setIsConformityChecked] = useState(false);
+  const [docUploadFile, setDocUploadFile] = useState(null);
 
   // State for Global Messages
   const [msgModal, setMsgModal] = useState({ isOpen: false, message: '', type: 'info', onConfirm: null });
@@ -129,6 +131,78 @@ const Patients = () => {
 
   const showMsg = (message, type = 'info', onConfirm = null) => {
     setMsgModal({ isOpen: true, message, type, onConfirm });
+  };
+
+  // Speech Recognition / Voice Dictation (es-AR)
+  const [isListening, setIsListening] = useState(false);
+  const [listeningField, setListeningField] = useState(null);
+  const recognitionRef = React.useRef(null);
+
+  const stopDictation = () => {
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch (e) {}
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+    setListeningField(null);
+  };
+
+  const toggleDictation = (setTargetState, fieldId) => {
+    if (isListening && listeningField === fieldId) {
+      stopDictation();
+      return;
+    }
+
+    stopDictation();
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showMsg('Tu navegador no soporta el dictado por voz nativo. Te recomendamos utilizar Google Chrome, Microsoft Edge o Safari.', 'alert');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = 'es-AR'; // Castellano Argentino
+
+      recognition.onresult = (event) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            transcript += event.results[i][0].transcript;
+          }
+        }
+        if (transcript) {
+          setTargetState(prev => {
+            const space = prev && !prev.endsWith(' ') ? ' ' : '';
+            return prev + space + transcript.trim();
+          });
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Error en reconocimiento de voz:', event.error);
+        if (event.error === 'not-allowed') {
+          showMsg('Permiso de micrófono denegado. Por favor habilita el permiso de micrófono en la barra de tu navegador.', 'alert');
+        }
+        stopDictation();
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        setListeningField(null);
+      };
+
+      recognition.start();
+      recognitionRef.current = recognition;
+      setIsListening(true);
+      setListeningField(fieldId);
+    } catch (err) {
+      console.error('No se pudo iniciar el dictado por voz:', err);
+      stopDictation();
+    }
   };
 
   useEffect(() => {
@@ -186,7 +260,7 @@ const Patients = () => {
     try {
       const response = await api.post(`/patients/${editingId}/tests`, newTest);
       setPatientTests([response.data, ...patientTests].sort((a, b) => new Date(b.date) - new Date(a.date)));
-      setNewTest({ testId: '', date: new Date().toISOString().split('T')[0] });
+      setNewTest({ testId: '', date: getLocalDate() });
     } catch (err) {
       showMsg('Error al agregar la prueba', 'alert');
     }
@@ -295,8 +369,11 @@ const Patients = () => {
   };
 
   const handleFileUpload = async (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length === 0 || !editingId) return;
+    e.preventDefault();
+    if (!docUploadFile || !editingId) return;
+
+    const files = Array.from(docUploadFile);
+    if (files.length === 0) return;
 
     const uploadFile = async (file) => {
       const data = new FormData();
@@ -316,14 +393,14 @@ const Patients = () => {
     try {
       const results = await Promise.all(files.map(file => uploadFile(file)));
       setPatientDocs([...patientDocs, ...results]);
-      // Success message removed as per user request
       fetchPatients();
     } catch (err) {
       showMsg('Hubo un error al subir uno o más documentos', 'alert');
     } finally {
-      // Clear input so same file can be uploaded again if needed
-      e.target.value = '';
+      setDocUploadFile(null);
       setIsConformityChecked(false);
+      const fileInput = document.getElementById('patient-file-upload');
+      if (fileInput) fileInput.value = '';
     }
   };
 
@@ -552,7 +629,7 @@ const Patients = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} noValidate>
               <div style={{ display: activeTab === 'personal' ? 'block' : 'none' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                   <div>
@@ -601,7 +678,7 @@ const Patients = () => {
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '4px' }}>Fecha de Nac.</label>
-                    <input type="date" max={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }} value={formData.birthDate || ''} onChange={e => setFormData({...formData, birthDate: e.target.value})} />
+                    <input type="date" max={getLocalDate()} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }} value={formData.birthDate || ''} onChange={e => setFormData({...formData, birthDate: e.target.value})} />
                   </div>
                 </div>
                 <div style={{ marginBottom: '2rem' }}>
@@ -664,33 +741,42 @@ const Patients = () => {
                   </div>
                 ) : (
                   <div>
-                    <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <input 
-                        type="file" 
-                        multiple
-                        onChange={handleFileUpload} 
-                        accept=".pdf,image/*,.doc,.docx,.xls,.xlsx"
-                        style={{ display: 'none' }}
-                        id="patient-file-upload"
-                      />
-                      <label 
-                        htmlFor="patient-file-upload"
-                        className="btn btn-primary"
-                        style={{ cursor: 'pointer', display: 'inline-block', margin: 0 }}
-                      >
-                        Subir Documento
-                      </label>
-                      <span style={{ fontSize: '0.8rem', color: '#888' }}>(PDF, Imágenes, Word, Excel)</span>
-                      
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', background: '#f0f9ff', padding: '6px 12px', borderRadius: '8px', border: '1px solid #bae6fd', color: '#0369a1', marginLeft: 'auto' }}>
-                        <input 
-                          type="checkbox" 
-                          checked={isConformityChecked}
-                          onChange={(e) => setIsConformityChecked(e.target.checked)}
-                          style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                        />
-                        <span>¿Es Certificado de Conformidad?</span>
-                      </label>
+                    <div style={{ marginTop: '1rem', background: '#f8f9fa', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+                      <h4 style={{ margin: '0 0 10px 0' }}>Subir Nuevo Documento</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'end' }}>
+                          <div>
+                            <label style={{ fontSize: '0.9rem', display: 'block', marginBottom: '4px' }}>Archivo</label>
+                            <input 
+                              type="file" 
+                              multiple
+                              onChange={(e) => setDocUploadFile(e.target.files)} 
+                              accept=".pdf,image/*,.doc,.docx,.xls,.xlsx"
+                              className="form-control"
+                              style={{ width: '100%', padding: '5px', borderRadius: '8px', border: '1px solid #ddd', background: 'white' }}
+                              id="patient-file-upload"
+                            />
+                          </div>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', background: '#f0f9ff', padding: '6px 12px', borderRadius: '8px', border: '1px solid #bae6fd', color: '#0369a1' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={isConformityChecked}
+                              onChange={(e) => setIsConformityChecked(e.target.checked)}
+                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            <span>¿Es Certificado de Conformidad?</span>
+                          </label>
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={handleFileUpload} 
+                          className="btn btn-primary" 
+                          disabled={!docUploadFile || docUploadFile.length === 0}
+                          style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
+                        >
+                          <Upload size={16} /> Subir Documento
+                        </button>
+                      </div>
                     </div>
 
                     <div style={{ border: '1px solid #eee', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto' }}>
@@ -711,7 +797,7 @@ const Patients = () => {
                             )}
                           </div>
                           <button type="button" onClick={() => handleDeleteDoc(doc.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
-                            <X size={16} />
+                            <Trash2 size={16} />
                           </button>
                         </div>
                       )) : (
@@ -790,7 +876,7 @@ const Patients = () => {
                           style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd' }}
                           value={newTest.date}
                           onChange={e => setNewTest({...newTest, date: e.target.value})}
-                          max={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]}
+                          max={getLocalDate()}
                         />
                       </div>
                       <button 
@@ -817,7 +903,7 @@ const Patients = () => {
                           </div>
                           {isAdmin && (
                             <button type="button" onClick={() => handleDeleteTest(pt.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
-                              <X size={16} />
+                              <Trash2 size={16} />
                             </button>
                           )}
                         </div>
@@ -940,6 +1026,9 @@ const Patients = () => {
                     <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => handleEdit(p)} title="Editar Paciente">
                       <Edit3 size={18} color="#4a90e2" />
                     </button>
+                    <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => openActivities(p)} title="Historia Clínica">
+                      <Activity size={18} color="var(--light-blue)" />
+                    </button>
                     
                     <div style={{ position: 'relative' }}>
                       <button 
@@ -957,9 +1046,6 @@ const Patients = () => {
                         }}>
                           <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', transition: 'background 0.2s' }} onClick={() => openSessions(p)}>
                             <Calendar size={16} color="var(--primary)" /> <span style={{ fontSize: '0.9rem' }}>Sesiones</span>
-                          </button>
-                          <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', transition: 'background 0.2s' }} onClick={() => openActivities(p)}>
-                            <Activity size={16} color="var(--light-blue)" /> <span style={{ fontSize: '0.9rem' }}>Historia Clínica</span>
                           </button>
                           {isAdmin && (
                             <>
@@ -1016,11 +1102,14 @@ const Patients = () => {
               </div>
 
               <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid #eee', paddingTop: '1rem', marginTop: 'auto', alignItems: 'center' }}>
-                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555' }} onClick={() => openViewModal(p)}>
+                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555', fontSize: '0.85rem' }} onClick={() => openViewModal(p)}>
                   <Eye size={16} color="#4a90e2" /> Ver
                 </button>
-                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555' }} onClick={() => handleEdit(p)}>
+                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555', fontSize: '0.85rem' }} onClick={() => handleEdit(p)}>
                   <Edit3 size={16} color="#4a90e2" /> Editar
+                </button>
+                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555', fontSize: '0.85rem' }} onClick={() => openActivities(p)}>
+                  <Activity size={16} color="var(--light-blue)" /> H. Clín.
                 </button>
                 
                 <div style={{ position: 'relative' }}>
@@ -1039,9 +1128,6 @@ const Patients = () => {
                     }}>
                       <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => openSessions(p)}>
                         <Calendar size={16} color="var(--primary)" /> <span style={{ fontSize: '0.9rem' }}>Sesiones</span>
-                      </button>
-                      <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => openActivities(p)}>
-                        <Activity size={16} color="var(--light-blue)" /> <span style={{ fontSize: '0.9rem' }}>Historia Clínica</span>
                       </button>
                       {isAdmin && (
                         <>
@@ -1072,7 +1158,7 @@ const Patients = () => {
         }}>
           <div className="card" style={{ width: '100%', maxWidth: '600px', position: 'relative', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <button 
-              onClick={() => { setShowActivitiesModal(false); setSelectedPatient(null); setNewActivityDesc(''); }}
+              onClick={() => { stopDictation(); setShowActivitiesModal(false); setSelectedPatient(null); setNewActivityDesc(''); }}
               style={{ position: 'absolute', right: '20px', top: '20px', background: 'transparent', border: 'none', cursor: 'pointer' }}
             >
               <X size={24} />
@@ -1090,13 +1176,42 @@ const Patients = () => {
                       {isAdmin && (
                         <div style={{ display: 'flex', gap: '5px' }}>
                           <button type="button" onClick={() => startEditActivity(act)} style={{ background: 'transparent', border: 'none', color: '#4a90e2', cursor: 'pointer' }}><Edit3 size={14} /></button>
-                          <button type="button" onClick={() => handleDeleteActivity(act.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}><X size={14} /></button>
+                          <button type="button" onClick={() => handleDeleteActivity(act.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={14} /></button>
                         </div>
                       )}
                     </div>
                   </div>
                   {editingActivityId === act.id ? (
                     <div style={{ marginTop: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#666', fontWeight: 'bold' }}>Editar Nota</span>
+                        <button
+                          type="button"
+                          onClick={() => toggleDictation(setEditingActivityDesc, `edit-${act.id}`)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '4px 10px',
+                            borderRadius: '16px',
+                            border: isListening && listeningField === `edit-${act.id}` ? '1px solid #ef4444' : '1px solid #3b82f6',
+                            backgroundColor: isListening && listeningField === `edit-${act.id}` ? '#fee2e2' : '#eff6ff',
+                            color: isListening && listeningField === `edit-${act.id}` ? '#dc2626' : '#2563eb',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: '600'
+                          }}
+                          title="Dictar por voz (es-AR)"
+                        >
+                          {isListening && listeningField === `edit-${act.id}` ? <MicOff size={14} /> : <Mic size={14} />}
+                          {isListening && listeningField === `edit-${act.id}` ? 'Detener (es-AR)' : 'Dictar Voz (es-AR)'}
+                        </button>
+                      </div>
+                      {isListening && listeningField === `edit-${act.id}` && (
+                        <div style={{ fontSize: '0.75rem', color: '#dc2626', marginBottom: '6px', fontWeight: '500' }}>
+                          🔴 Escuchando voz (es-AR)... hable ahora.
+                        </div>
+                      )}
                       <textarea 
                         rows="3" 
                         style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
@@ -1104,8 +1219,8 @@ const Patients = () => {
                         onChange={e => setEditingActivityDesc(e.target.value)}
                       />
                       <div style={{ display: 'flex', gap: '8px', marginTop: '8px', justifyContent: 'flex-end' }}>
-                        <button type="button" className="btn" onClick={() => setEditingActivityId(null)}>Cancelar</button>
-                        <button type="button" className="btn btn-primary" onClick={() => handleUpdateActivity(act.id)}>Guardar</button>
+                        <button type="button" className="btn" onClick={() => { stopDictation(); setEditingActivityId(null); }}>Cancelar</button>
+                        <button type="button" className="btn btn-primary" onClick={() => { stopDictation(); handleUpdateActivity(act.id); }}>Guardar</button>
                       </div>
                     </div>
                   ) : (
@@ -1117,10 +1232,49 @@ const Patients = () => {
               )}
             </div>
 
-              {/* Add Activity Form */}
-            <form onSubmit={handleAddActivity} style={{ borderTop: '2px solid var(--soft-gray)', paddingTop: '1.5rem' }}>
+            {/* Add Activity Form */}
+            <form onSubmit={(e) => { stopDictation(); handleAddActivity(e); }} style={{ borderTop: '2px solid var(--soft-gray)', paddingTop: '1.5rem' }}>
               <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '8px', fontWeight: 'bold' }}>Nueva Historia Clínica</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Nueva Historia Clínica</label>
+                  <button
+                    type="button"
+                    onClick={() => toggleDictation(setNewActivityDesc, 'new')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '5px 12px',
+                      borderRadius: '20px',
+                      border: isListening && listeningField === 'new' ? '1px solid #ef4444' : '1px solid #3b82f6',
+                      backgroundColor: isListening && listeningField === 'new' ? '#fee2e2' : '#eff6ff',
+                      color: isListening && listeningField === 'new' ? '#dc2626' : '#2563eb',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      fontWeight: '600',
+                      transition: 'all 0.2s ease'
+                    }}
+                    title="Dictar por voz en castellano argentino (es-AR)"
+                  >
+                    {isListening && listeningField === 'new' ? (
+                      <>
+                        <MicOff size={16} />
+                        <span>Detener Dictado (es-AR)</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic size={16} />
+                        <span>Dictar por Voz (es-AR)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                {isListening && listeningField === 'new' && (
+                  <div style={{ fontSize: '0.8rem', color: '#dc2626', marginBottom: '8px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#dc2626', display: 'inline-block' }}></span>
+                    Escuchando voz (es-AR)... hable y el texto se transcribirá automáticamente.
+                  </div>
+                )}
                 <textarea 
                   required
                   rows="3"
