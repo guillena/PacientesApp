@@ -19,7 +19,6 @@ const testRoutes = require('./src/routes/testRoutes');
 const profDocTypeRoutes = require('./src/routes/profDocTypeRoutes');
 const { Test, ProfDocType } = require('./src/models');
 const { seedTests } = require('./src/utils/seedTests');
-const { serveMobilePage, handleMobilePhotoUpload } = require('./src/controllers/mobilePhotoController');
 const upload = require('./src/middleware/upload');
 
 const app = express();
@@ -52,8 +51,10 @@ app.use('/api/prof-doc-types', profDocTypeRoutes);
 // Mobile QR photo upload routes (public-ish, secured by short-lived JWT in query string)
 // Uses a simple memory-storage multer to avoid issues with the complex shared upload middleware
 const multerMemory = require('multer')({ storage: require('multer').memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
+const { serveMobilePage, handleMobilePhotoUpload, handleMobilePatientPhotoUpload } = require('./src/controllers/mobilePhotoController');
 app.get('/mobile-photo', serveMobilePage);
 app.post('/mobile-photo/upload', multerMemory.single('file'), handleMobilePhotoUpload);
+app.post('/mobile-photo/upload-patient', multerMemory.single('file'), handleMobilePatientPhotoUpload);
 
 
 

@@ -5,6 +5,7 @@ const {
   deletePatient, getPatientDocument, triggerBirthdayEmail,
   getPatientTests, addPatientTest, deletePatientTest
 } = require('../controllers/patientController');
+const { generatePatientPhotoToken } = require('../controllers/mobilePhotoController');
 const { auth, isAdmin } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const router = express.Router();
@@ -13,6 +14,7 @@ router.post('/', auth, createPatient);
 router.get('/', auth, getPatients);
 router.get('/document-types', auth, getDocumentTypes);
 router.post('/send-birthday-email', auth, triggerBirthdayEmail);
+router.post('/:patientId/photo-token', auth, generatePatientPhotoToken);
 router.get('/:id', auth, getPatient);
 router.patch('/:id', auth, updatePatient);
 router.delete('/:id', auth, isAdmin, deletePatient);

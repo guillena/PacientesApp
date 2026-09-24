@@ -1,5 +1,5 @@
-const jwt = require('jsonwebtoken');
-const { Professional, ProfessionalDocument, ProfDocType } = require('../models');
+﻿const jwt = require('jsonwebtoken');
+const { Professional, ProfessionalDocument, ProfDocType, Patient, PatientDocument } = require('../models');
 
 
 /**
@@ -55,7 +55,7 @@ const generatePhotoToken = async (req, res) => {
 /**
  * GET /mobile-photo
  * Serves the mobile HTML camera page.
- * Uses <input type="file" capture="environment"> — works on HTTP AND HTTPS.
+ * Uses <input type="file" capture="environment"> â€” works on HTTP AND HTTPS.
  * (getUserMedia requires HTTPS/secure context; file input capture does NOT)
  */
 const serveMobilePage = async (req, res) => {
@@ -68,16 +68,22 @@ const serveMobilePage = async (req, res) => {
   let decoded;
   try {
     decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decoded.photoUpload) throw new Error('Token inválido');
+    if (!decoded.photoUpload) throw new Error('Token invÃ¡lido');
   } catch (e) {
-    return res.status(401).send('<h2 style="font-family:sans-serif;padding:2rem;color:#e74c3c">El enlace expiró o es inválido. Pedí un nuevo QR.</h2>');
+    return res.status(401).send('<h2 style="font-family:sans-serif;padding:2rem;color:#e74c3c">El enlace expirÃ³ o es invÃ¡lido. PedÃ­ un nuevo QR.</h2>');
   }
 
-  const prof = await Professional.findByPk(decoded.professionalId);
-  const profName = prof ? `${prof.firstName} ${prof.lastName}` : 'Profesional';
-
-  // Relative URL — resolves correctly on any host (local IP or Railway)
-  const uploadUrl = `/mobile-photo/upload?token=${encodeURIComponent(token)}`;
+  // Determine entity name and upload URL based on entityType
+  let entityName;
+  let uploadUrl;
+  if (decoded.entityType === 'patient') {
+    entityName = decoded.patientName || 'Paciente';
+    uploadUrl = `/mobile-photo/upload-patient?token=${encodeURIComponent(token)}`;
+  } else {
+    const prof = await Professional.findByPk(decoded.professionalId);
+    entityName = prof ? `${prof.firstName} ${prof.lastName}` : 'Profesional';
+    uploadUrl = `/mobile-photo/upload?token=${encodeURIComponent(token)}`;
+  }
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -88,7 +94,7 @@ const serveMobilePage = async (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Subir Foto – ${profName}</title>
+  <title>Subir Foto â€“ ${entityName}</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -203,7 +209,7 @@ const serveMobilePage = async (req, res) => {
   </style>
 </head>
 <body>
-  <header>Subir foto para <span>${profName}</span></header>
+  <header>Subir foto para <span>${entityName}</span></header>
   <div id="main">
 
     <div id="preview-wrap">
@@ -212,7 +218,7 @@ const serveMobilePage = async (req, res) => {
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
           <circle cx="12" cy="13" r="4"/>
         </svg>
-        <span>Tocá el botón para abrir la cámara</span>
+        <span>TocÃ¡ el botÃ³n para abrir la cÃ¡mara</span>
       </div>
       <img id="photo-preview" alt="Foto seleccionada" />
     </div>
@@ -220,7 +226,7 @@ const serveMobilePage = async (req, res) => {
     <input id="file-input" type="file" accept="image/*" capture="environment" />
 
     <div class="controls">
-      <button id="camera-btn" title="Abrir cámara">
+      <button id="camera-btn" title="Abrir cÃ¡mara">
         <div class="inner">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2">
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -228,11 +234,11 @@ const serveMobilePage = async (req, res) => {
           </svg>
         </div>
       </button>
-      <button id="retake-btn" class="btn">↩ Otra foto</button>
-      <button id="upload-btn" class="btn">✓ Subir</button>
+      <button id="retake-btn" class="btn">â†© Otra foto</button>
+      <button id="upload-btn" class="btn">âœ“ Subir</button>
     </div>
 
-    <div id="status">Tocá el botón para sacar una foto.</div>
+    <div id="status">TocÃ¡ el botÃ³n para sacar una foto.</div>
     <button id="close-btn" class="btn" onclick="window.close(); history.go(-1);">Cerrar</button>
   </div>
 
@@ -262,11 +268,11 @@ const serveMobilePage = async (req, res) => {
 
       cameraBtn.style.display = 'none';
       retakeBtn.style.display = 'flex';
-      retakeBtn.textContent = '↩ Otra foto';
+      retakeBtn.textContent = 'â†© Otra foto';
       retakeBtn.disabled = false;
       uploadBtn.style.display = 'flex';
       uploadBtn.disabled = false;
-      status.textContent = '¿Se ve bien? Podés sacar otra o subir la foto.';
+      status.textContent = 'Â¿Se ve bien? PodÃ©s sacar otra o subir la foto.';
       status.className = '';
     });
 
@@ -284,7 +290,7 @@ const serveMobilePage = async (req, res) => {
         const res = await fetch('${uploadUrl}', { method: 'POST', body: formData });
         const data = await res.json();
         if (res.ok) {
-          status.textContent = '✓ Foto subida correctamente.';
+          status.textContent = 'âœ“ Foto subida correctamente.';
           status.className = 'success';
           photoPreview.style.opacity = '0.5';
           uploadBtn.style.display = 'none';
@@ -321,13 +327,13 @@ const handleMobilePhotoUpload = async (req, res) => {
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
-      if (!decoded.photoUpload) throw new Error('Token inválido');
+      if (!decoded.photoUpload) throw new Error('Token invÃ¡lido');
     } catch (e) {
-      return res.status(401).send({ error: 'El enlace expiró o es inválido.' });
+      return res.status(401).send({ error: 'El enlace expirÃ³ o es invÃ¡lido.' });
     }
 
     if (!req.file) {
-      return res.status(400).send({ error: 'No se recibió ningún archivo' });
+      return res.status(400).send({ error: 'No se recibiÃ³ ningÃºn archivo' });
     }
 
     const { professionalId, username } = decoded;
@@ -394,4 +400,119 @@ const handleMobilePhotoUpload = async (req, res) => {
   }
 };
 
-module.exports = { generatePhotoToken, serveMobilePage, handleMobilePhotoUpload };
+/**
+ * POST /api/patients/:patientId/photo-token
+ * Generates a temporary JWT token for mobile photo upload to a patient (15 min TTL)
+ */
+const generatePatientPhotoToken = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const patient = await Patient.findByPk(patientId);
+    if (!patient) return res.status(404).send({ error: 'Paciente no encontrado' });
+
+    const token = jwt.sign(
+      { photoUpload: true, entityType: 'patient', patientId: patientId, patientName: `${patient.firstName} ${patient.lastName}` },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    // Build mobile URL (same logic as generatePhotoToken)
+    let protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    let host = req.headers.host || 'localhost:5000';
+    if (process.env.BACKEND_URL) {
+      host = process.env.BACKEND_URL.replace(/^https?:\/\//, '');
+      protocol = process.env.BACKEND_URL.startsWith('https') ? 'https' : 'http';
+    } else if (host.startsWith('localhost') || host.startsWith('127.')) {
+      const os = require('os');
+      const nets = os.networkInterfaces();
+      let localIp = null;
+      for (const name of Object.keys(nets)) {
+        for (const iface of nets[name]) {
+          if (iface.family === 'IPv4' && !iface.internal) {
+            if (!localIp || iface.address.startsWith('192.168') || iface.address.startsWith('10.')) localIp = iface.address;
+          }
+        }
+      }
+      if (localIp) {
+        const port = host.includes(':') ? host.split(':')[1] : '5000';
+        host = `${localIp}:${port}`;
+      }
+    }
+
+    const mobileUrl = `${protocol}://${host}/mobile-photo?token=${token}`;
+    res.send({ token, url: mobileUrl });
+  } catch (e) {
+    res.status(500).send({ error: e.message });
+  }
+};
+
+/**
+ * POST /mobile-photo/upload-patient
+ * Receives the photo for a patient, validates the temp token, saves to S3 / local disk.
+ */
+const handleMobilePatientPhotoUpload = async (req, res) => {
+  try {
+    console.log('[MobilePatientUpload] Request received. token present:', !!req.query.token, 'file present:', !!req.file);
+
+    const { token } = req.query;
+    if (!token) return res.status(400).send({ error: 'Token requerido' });
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (!decoded.photoUpload || decoded.entityType !== 'patient') throw new Error('Token invÃ¡lido');
+    } catch (e) {
+      return res.status(401).send({ error: 'El enlace expirÃ³ o es invÃ¡lido.' });
+    }
+
+    if (!req.file) return res.status(400).send({ error: 'No se recibiÃ³ ningÃºn archivo' });
+
+    const { patientId } = decoded;
+    const patient = await Patient.findByPk(patientId);
+    if (!patient) return res.status(404).send({ error: 'Paciente no encontrado' });
+
+    const folderName = `paciente_${patientId}`;
+    const fileName = `${Date.now()}-${req.file.originalname}`;
+    const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    const bucketName = process.env.BUCKET_NAME || process.env.BUCKET;
+
+    let url;
+    if (bucketName) {
+      const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+      const s3 = new S3Client({
+        region: process.env.REGION || 'us-east-1',
+        endpoint: process.env.ENDPOINT,
+        credentials: { accessKeyId: process.env.ACCESS_KEY_ID, secretAccessKey: process.env.SECRET_ACCESS_KEY },
+        forcePathStyle: true,
+      });
+      const s3Key = `pacientes/${folderName}/${fileName}`;
+      await s3.send(new PutObjectCommand({ Bucket: bucketName, Key: s3Key, Body: req.file.buffer, ContentType: req.file.mimetype || 'image/jpeg' }));
+      url = `${process.env.ENDPOINT}/${bucketName}/${s3Key}`;
+    } else {
+      const fs = require('fs');
+      const path = require('path');
+      const uploadDir = path.join(__dirname, '../../uploads', 'pacientes', folderName);
+      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+      fs.writeFileSync(path.join(uploadDir, fileName), req.file.buffer);
+      const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
+      url = `${baseUrl}/uploads/pacientes/${folderName}/${fileName}`;
+    }
+
+    const doc = await PatientDocument.create({
+      patientId,
+      originalName,
+      url,
+      mimetype: req.file.mimetype || 'image/jpeg',
+      size: req.file.size,
+      isConformity: false,
+    });
+
+    console.log('[MobilePatientUpload] Success! Document id:', doc.id);
+    res.status(201).send(doc);
+  } catch (e) {
+    console.error('[MobilePatientUpload] ERROR:', e);
+    res.status(500).send({ error: e.message });
+  }
+};
+
+module.exports = { generatePhotoToken, serveMobilePage, handleMobilePhotoUpload, generatePatientPhotoToken, handleMobilePatientPhotoUpload };

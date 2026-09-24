@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { Search, UserPlus, Edit3, X, ArrowUpDown, ArrowUp, ArrowDown, Activity, List, Grid, Eye, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCw, FileText, Trash2, Calendar, CheckCircle2, MoreVertical, ClipboardList, Upload, Mic, MicOff } from 'lucide-react';
+import { Search, UserPlus, Edit3, X, ArrowUpDown, ArrowUp, ArrowDown, Activity, List, Grid, Eye, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCw, FileText, Trash2, Calendar, CheckCircle2, MoreVertical, ClipboardList, Upload, Mic, MicOff, QrCode } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import MessageModal from '../components/MessageModal';
 import { useAuth } from '../store/AuthContext';
 
@@ -117,6 +118,27 @@ const Patients = () => {
   const [imgRotation, setImgRotation] = useState(0);
   const [isConformityChecked, setIsConformityChecked] = useState(false);
   const [docUploadFile, setDocUploadFile] = useState(null);
+
+  // QR Photo Upload state (patient)
+  const [showPatientQrModal, setShowPatientQrModal] = useState(false);
+  const [patientQrUrl, setPatientQrUrl] = useState('');
+  const [patientQrLoading, setPatientQrLoading] = useState(false);
+
+  const handleOpenPatientQr = async () => {
+    if (!editingId) return;
+    setPatientQrLoading(true);
+    setPatientQrUrl('');
+    setShowPatientQrModal(true);
+    try {
+      const res = await api.post(`/patients/${editingId}/photo-token`);
+      setPatientQrUrl(res.data.url);
+    } catch (e) {
+      setShowPatientQrModal(false);
+      showMsg('Error al generar el QR: ' + (e.response?.data?.error || e.message), 'alert');
+    } finally {
+      setPatientQrLoading(false);
+    }
+  };
 
   // State for Global Messages
   const [msgModal, setMsgModal] = useState({ isOpen: false, message: '', type: 'info', onConfirm: null });
@@ -742,8 +764,17 @@ const Patients = () => {
                 ) : (
                   <div>
                     <div style={{ marginTop: '1rem', background: '#f8f9fa', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
-                      <h4 style={{ margin: '0 0 10px 0' }}>Subir Nuevo Documento</h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <h4 style={{ margin: 0 }}>Subir Nuevo Documento</h4>
+                        <button
+                          type="button"
+                          onClick={handleOpenPatientQr}
+                          title="Subir foto desde celular (QR)"
+                          style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#475569' }}
+                        >
+                          <QrCode size={15} /> QR
+                        </button>
+                      </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'end' }}>
                           <div>
                             <label style={{ fontSize: '0.9rem', display: 'block', marginBottom: '4px' }}>Archivo</label>
@@ -1395,6 +1426,37 @@ const Patients = () => {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Patient QR Photo Upload Modal */}
+      {showPatientQrModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: 'white', borderRadius: '16px', padding: '2rem', maxWidth: '380px', width: '90%', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ margin: '0 0 8px', color: '#1e293b' }}>Subir foto con celular</h3>
+            <p style={{ color: '#64748b', fontSize: '0.9rem', margin: '0 0 20px' }}>
+              Escaneá este código QR con la cámara del celular para subir una foto al paciente.<br />
+              <strong>Válido por 15 minutos.</strong>
+            </p>
+            {patientQrLoading ? (
+              <div style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 40, height: 40, border: '4px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              </div>
+            ) : patientQrUrl ? (
+              <>
+                <div style={{ display: 'inline-block', padding: '12px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+                  <QRCodeSVG value={patientQrUrl} size={200} level="M" />
+                </div>
+                <p style={{ fontSize: '0.72rem', color: '#94a3b8', wordBreak: 'break-all', marginTop: '10px', maxWidth: '300px' }}>{patientQrUrl}</p>
+              </>
+            ) : null}
+            <button
+              onClick={() => { setShowPatientQrModal(false); /* reload docs */ api.get(`/patients/${editingId}`).then(r => setPatientDocs(r.data.PatientDocuments || [])); }}
+              style={{ marginTop: '16px', width: '100%', padding: '12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }}
+            >
+              Listo
+            </button>
           </div>
         </div>
       )}
