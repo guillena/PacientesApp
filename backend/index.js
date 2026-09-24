@@ -19,6 +19,8 @@ const testRoutes = require('./src/routes/testRoutes');
 const profDocTypeRoutes = require('./src/routes/profDocTypeRoutes');
 const { Test, ProfDocType } = require('./src/models');
 const { seedTests } = require('./src/utils/seedTests');
+const { serveMobilePage, handleMobilePhotoUpload } = require('./src/controllers/mobilePhotoController');
+const upload = require('./src/middleware/upload');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -46,6 +48,11 @@ app.use('/api/activities', activityRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/tests', testRoutes);
 app.use('/api/prof-doc-types', profDocTypeRoutes);
+
+// Mobile QR photo upload routes (public-ish, secured by short-lived JWT in query string)
+app.get('/mobile-photo', serveMobilePage);
+app.post('/mobile-photo/upload', upload.single('file'), handleMobilePhotoUpload);
+
 
 // Basic Route
 app.get('/health', (req, res) => {

@@ -33,7 +33,18 @@ if (useS3) {
     },
     key: function (req, file, cb) {
       const id = req.params.id || req.params.professionalId;
-      if (req.originalUrl.includes('/professionals/')) {
+      if (req.originalUrl.includes('/mobile-photo/upload')) {
+        const jwt = require('jsonwebtoken');
+        try {
+          const decoded = jwt.verify(req.query.token, process.env.JWT_SECRET);
+          const { Professional } = require('../models');
+          Professional.findByPk(decoded.professionalId).then(prof => {
+            const folderName = prof ? prof.username : decoded.professionalId;
+            const fileName = `${Date.now()}-${file.originalname}`;
+            cb(null, `profesionales/${folderName}/${fileName}`);
+          }).catch(err => cb(err));
+        } catch (e) { cb(e); }
+      } else if (req.originalUrl.includes('/professionals/')) {
         const { Professional } = require('../models');
         Professional.findByPk(id).then(prof => {
           const folderName = prof ? prof.username : id;
@@ -62,23 +73,30 @@ if (useS3) {
   storage = multer.diskStorage({
     destination: function (req, file, cb) {
       const id = req.params.id || req.params.professionalId;
-      if (req.originalUrl.includes('/professionals/')) {
+      const handleProfDir = (folderName) => {
+        const profDir = path.join(uploadDir, 'profesionales', folderName);
+        if (!fs.existsSync(profDir)) fs.mkdirSync(profDir, { recursive: true });
+        cb(null, profDir);
+      };
+      if (req.originalUrl.includes('/mobile-photo/upload')) {
+        const jwt = require('jsonwebtoken');
+        try {
+          const decoded = jwt.verify(req.query.token, process.env.JWT_SECRET);
+          const { Professional } = require('../models');
+          Professional.findByPk(decoded.professionalId).then(prof => {
+            handleProfDir(prof ? prof.username : String(decoded.professionalId));
+          }).catch(err => cb(err));
+        } catch (e) { cb(e); }
+      } else if (req.originalUrl.includes('/professionals/')) {
         const { Professional } = require('../models');
         Professional.findByPk(id).then(prof => {
-          const folderName = prof ? prof.username : id;
-          const profDir = path.join(uploadDir, 'profesionales', folderName);
-          if (!fs.existsSync(profDir)){
-              fs.mkdirSync(profDir, { recursive: true });
-          }
-          cb(null, profDir);
+          handleProfDir(prof ? prof.username : id);
         }).catch(err => cb(err));
       } else {
         Patient.findByPk(id).then(patient => {
           const folderName = patient ? patient.docNumber : id;
           const patientDir = path.join(uploadDir, folderName);
-          if (!fs.existsSync(patientDir)){
-              fs.mkdirSync(patientDir, { recursive: true });
-          }
+          if (!fs.existsSync(patientDir)) fs.mkdirSync(patientDir, { recursive: true });
           cb(null, patientDir);
         }).catch(err => cb(err));
       }

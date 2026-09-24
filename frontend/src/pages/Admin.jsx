@@ -3,8 +3,9 @@ import api from '../api';
 import { 
   Plus, Edit3, Trash2, X, Users, Settings, ChevronUp, ChevronDown, 
   Eye, EyeOff, Folder, Download, ClipboardList, Search, ChevronLeft, ChevronRight, FileText, Upload, File, FilePlus,
-  ZoomIn, ZoomOut, RotateCw, Maximize2, Minimize2
+  ZoomIn, ZoomOut, RotateCw, Maximize2, Minimize2, QrCode
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import MessageModal from '../components/MessageModal';
 
 const Admin = () => {
@@ -58,6 +59,11 @@ const Admin = () => {
   const [selectedProfForDocs, setSelectedProfForDocs] = useState(null);
   const [profDocs, setProfDocs] = useState([]);
   const [docUploadForm, setDocUploadForm] = useState({ profDocTypeId: '', file: null });
+
+  // State for QR Photo Upload
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [qrUrl, setQrUrl] = useState('');
+  const [qrLoading, setQrLoading] = useState(false);
 
   const [msgModal, setMsgModal] = useState({ isOpen: false, message: '', type: 'info', onConfirm: null });
 
@@ -304,6 +310,22 @@ const Admin = () => {
       document.body.removeChild(a);
     } catch (err) {
       showMsg('Error al intentar descargar el documento.', 'alert');
+    }
+  };
+
+  const handleOpenQr = async () => {
+    if (!selectedProfForDocs) return;
+    setQrLoading(true);
+    setQrUrl('');
+    setShowQrModal(true);
+    try {
+      const { data } = await api.post(`/professionals/${selectedProfForDocs.id}/photo-token`);
+      setQrUrl(data.url);
+    } catch (err) {
+      showMsg('Error al generar el código QR.', 'alert');
+      setShowQrModal(false);
+    } finally {
+      setQrLoading(false);
     }
   };
 
@@ -1399,7 +1421,23 @@ const Admin = () => {
         }}>
           <div className="card" style={{ width: '100%', maxWidth: '600px', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
             <button onClick={() => setShowProfDocsModal(false)} style={{ position: 'absolute', right: '15px', top: '15px', background: 'transparent', border: 'none', cursor: 'pointer' }}><X /></button>
-            <h2>Documentos de {selectedProfForDocs.firstName} {selectedProfForDocs.lastName}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '36px' }}>
+              <h2>Documentos de {selectedProfForDocs.firstName} {selectedProfForDocs.lastName}</h2>
+              <button
+                type="button"
+                onClick={handleOpenQr}
+                title="Subir foto desde celular con QR"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '7px 14px', borderRadius: '8px',
+                  background: 'var(--primary, #4f46e5)', color: 'white',
+                  border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600,
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <QrCode size={16} /> QR
+              </button>
+            </div>
             
             <form onSubmit={handleDocUpload} style={{ marginTop: '1rem', background: '#f8f9fa', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
               <h4 style={{ margin: '0 0 10px 0' }}>Subir Nuevo Documento</h4>
@@ -1461,6 +1499,42 @@ const Admin = () => {
                 ))}
               </ul>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* QR Photo Upload Modal */}
+      {showQrModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1200
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '380px', textAlign: 'center', padding: '2rem', position: 'relative' }}>
+            <button onClick={() => setShowQrModal(false)} style={{ position: 'absolute', right: '15px', top: '15px', background: 'transparent', border: 'none', cursor: 'pointer' }}><X /></button>
+            <h3 style={{ marginBottom: '0.4rem' }}>Subir foto con celular</h3>
+            <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '1.2rem' }}>
+              Escaneá este código QR con la cámara del celular para subir una foto al profesional.<br/>
+              <strong>Válido por 15 minutos.</strong>
+            </p>
+            {qrLoading ? (
+              <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <div style={{ width: 40, height: 40, border: '4px solid #e2e8f0', borderTopColor: 'var(--primary, #4f46e5)', borderRadius: '50%', animation: 'spin-prof 0.8s linear infinite' }} />
+              </div>
+            ) : qrUrl ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '2px solid #e2e8f0', display: 'inline-block' }}>
+                  <QRCodeSVG value={qrUrl} size={220} level="M" />
+                </div>
+                <p style={{ fontSize: '0.78rem', color: '#999', wordBreak: 'break-all', maxWidth: '300px' }}>{qrUrl}</p>
+              </div>
+            ) : null}
+            <button
+              className="btn btn-primary"
+              style={{ marginTop: '1rem', width: '100%' }}
+              onClick={() => { setShowQrModal(false); fetchProfDocs(selectedProfForDocs?.id); }}
+            >
+              Listo
+            </button>
           </div>
         </div>
       )}
