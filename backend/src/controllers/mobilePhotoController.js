@@ -22,8 +22,34 @@ const generatePhotoToken = async (req, res) => {
       { expiresIn: '15m' }
     );
 
-    const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
-    const mobileUrl = `${backendUrl}/mobile-photo?token=${token}`;
+    // Use BACKEND_URL env var (set on Railway), or derive from the request host for local dev.
+    // If the host is localhost, auto-detect the local network IP so the QR works on mobile.
+    let protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    let host = req.headers.host || 'localhost:5000';
+    if (process.env.BACKEND_URL) {
+      host = process.env.BACKEND_URL.replace(/^https?:\/\//, '');
+      protocol = process.env.BACKEND_URL.startsWith('https') ? 'https' : 'http';
+    } else if (host.startsWith('localhost') || host.startsWith('127.')) {
+      // In local dev: try to find the WiFi/LAN IP so phone can scan the QR
+      const os = require('os');
+      const nets = os.networkInterfaces();
+      let localIp = null;
+      for (const name of Object.keys(nets)) {
+        for (const iface of nets[name]) {
+          if (iface.family === 'IPv4' && !iface.internal) {
+            // Prefer WiFi addresses (192.168.x.x or 10.x.x.x)
+            if (!localIp || iface.address.startsWith('192.168') || iface.address.startsWith('10.')) {
+              localIp = iface.address;
+            }
+          }
+        }
+      }
+      if (localIp) {
+        const port = host.includes(':') ? host.split(':')[1] : '5000';
+        host = `${localIp}:${port}`;
+      }
+    }
+    const mobileUrl = `${protocol}://${host}/mobile-photo?token=${token}`;
 
     res.send({ token, url: mobileUrl });
   } catch (e) {
@@ -53,8 +79,8 @@ const serveMobilePage = async (req, res) => {
   const prof = await Professional.findByPk(decoded.professionalId);
   const profName = prof ? `${prof.firstName} ${prof.lastName}` : 'Profesional';
 
-  const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
-  const uploadUrl = `${backendUrl}/mobile-photo/upload?token=${encodeURIComponent(token)}`;
+  // Use relative URL so it works on any host (localhost or Railway)
+  const uploadUrl = `/mobile-photo/upload?token=${encodeURIComponent(token)}`;
 
   // Serve a self-contained HTML page — no React, pure HTML/CSS/JS
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
