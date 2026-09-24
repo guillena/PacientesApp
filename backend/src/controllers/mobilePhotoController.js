@@ -15,7 +15,7 @@ const generatePhotoToken = async (req, res) => {
     if (!prof) return res.status(404).send({ error: 'Profesional no encontrado' });
 
     const token = jwt.sign(
-      { photoUpload: true, professionalId: parseInt(professionalId), username: prof.username },
+      { photoUpload: true, professionalId: professionalId, username: prof.username },
       process.env.JWT_SECRET,
       { expiresIn: '15m' }
     );
