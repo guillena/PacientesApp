@@ -1439,18 +1439,17 @@ const Admin = () => {
               <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                 {profDocs.map(doc => (
                   <li key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderBottom: '1px solid #eee' }}>
-                    <div>
-                      <strong>{doc.ProfDocType?.name}</strong>
-                      <div style={{ fontSize: '0.8rem', color: '#666' }}>{doc.originalName}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px' }}>
+                      <strong style={{ color: '#555' }}>{doc.ProfDocType?.name}</strong>
+                      <button 
+                        type="button" 
+                        onClick={() => setShowingDoc(doc)}
+                        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontWeight: 'bold', fontSize: '0.9rem', textAlign: 'left', cursor: 'pointer' }}
+                      >
+                        {doc.originalName}
+                      </button>
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button 
-                        className="btn" 
-                        style={{ padding: '6px', color: '#1976d2', background: 'transparent', border: '1px solid #1976d2', borderRadius: '4px' }} 
-                        onClick={() => setShowingDoc(doc)}
-                      >
-                        Ver
-                      </button>
                       <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => handleDocDelete(doc.id)}>
                         <Trash2 size={18} color="#e74c3c" />
                       </button>
