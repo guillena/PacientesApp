@@ -1,9 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { Professional, ProfessionalDocument, ProfDocType } = require('../models');
-const path = require('path');
 
 // In-memory set to track used tokens (single-use per session, cleared on restart)
-// Tokens already have 15min TTL via JWT exp, this prevents replay within that window
 const usedTokens = new Set();
 
 /**
@@ -22,22 +20,21 @@ const generatePhotoToken = async (req, res) => {
       { expiresIn: '15m' }
     );
 
-    // Use BACKEND_URL env var (set on Railway), or derive from the request host for local dev.
-    // If the host is localhost, auto-detect the local network IP so the QR works on mobile.
+    // Use BACKEND_URL (Railway) or auto-detect LAN IP for local dev
     let protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
     let host = req.headers.host || 'localhost:5000';
+
     if (process.env.BACKEND_URL) {
       host = process.env.BACKEND_URL.replace(/^https?:\/\//, '');
       protocol = process.env.BACKEND_URL.startsWith('https') ? 'https' : 'http';
     } else if (host.startsWith('localhost') || host.startsWith('127.')) {
-      // In local dev: try to find the WiFi/LAN IP so phone can scan the QR
+      // In local dev: find WiFi/LAN IP so phone can scan the QR on the same network
       const os = require('os');
       const nets = os.networkInterfaces();
       let localIp = null;
       for (const name of Object.keys(nets)) {
         for (const iface of nets[name]) {
           if (iface.family === 'IPv4' && !iface.internal) {
-            // Prefer WiFi addresses (192.168.x.x or 10.x.x.x)
             if (!localIp || iface.address.startsWith('192.168') || iface.address.startsWith('10.')) {
               localIp = iface.address;
             }
@@ -49,8 +46,8 @@ const generatePhotoToken = async (req, res) => {
         host = `${localIp}:${port}`;
       }
     }
-    const mobileUrl = `${protocol}://${host}/mobile-photo?token=${token}`;
 
+    const mobileUrl = `${protocol}://${host}/mobile-photo?token=${token}`;
     res.send({ token, url: mobileUrl });
   } catch (e) {
     res.status(500).send({ error: e.message });
@@ -59,13 +56,15 @@ const generatePhotoToken = async (req, res) => {
 
 /**
  * GET /mobile-photo
- * Serves the mobile HTML camera page (validates token via query param)
+ * Serves the mobile HTML camera page.
+ * Uses <input type="file" capture="environment"> — works on HTTP AND HTTPS.
+ * (getUserMedia requires HTTPS/secure context; file input capture does NOT)
  */
 const serveMobilePage = async (req, res) => {
   const { token } = req.query;
 
   if (!token) {
-    return res.status(400).send('<h2>Token requerido</h2>');
+    return res.status(400).send('<h2 style="font-family:sans-serif;padding:2rem">Token requerido</h2>');
   }
 
   let decoded;
@@ -73,22 +72,24 @@ const serveMobilePage = async (req, res) => {
     decoded = jwt.verify(token, process.env.JWT_SECRET);
     if (!decoded.photoUpload) throw new Error('Token inválido');
   } catch (e) {
-    return res.status(401).send('<h2>El enlace expiró o es inválido. Pedí un nuevo QR.</h2>');
+    return res.status(401).send('<h2 style="font-family:sans-serif;padding:2rem;color:#e74c3c">El enlace expiró o es inválido. Pedí un nuevo QR.</h2>');
   }
 
   const prof = await Professional.findByPk(decoded.professionalId);
   const profName = prof ? `${prof.firstName} ${prof.lastName}` : 'Profesional';
 
-  // Use relative URL so it works on any host (localhost or Railway)
+  // Relative URL — resolves correctly on any host (local IP or Railway)
   const uploadUrl = `/mobile-photo/upload?token=${encodeURIComponent(token)}`;
 
-  // Serve a self-contained HTML page — no React, pure HTML/CSS/JS
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+
   res.send(`<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Subir Foto – ${profName}</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -96,7 +97,7 @@ const serveMobilePage = async (req, res) => {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: #0f172a;
       color: #f1f5f9;
-      min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -108,7 +109,6 @@ const serveMobilePage = async (req, res) => {
       text-align: center;
       font-size: 1rem;
       font-weight: 600;
-      letter-spacing: 0.02em;
       color: #94a3b8;
     }
     header span { color: #38bdf8; }
@@ -119,11 +119,10 @@ const serveMobilePage = async (req, res) => {
       align-items: center;
       justify-content: center;
       width: 100%;
-      padding: 20px;
+      padding: 24px 20px;
       gap: 20px;
     }
     #preview-wrap {
-      position: relative;
       width: 100%;
       max-width: 420px;
       border-radius: 16px;
@@ -133,32 +132,23 @@ const serveMobilePage = async (req, res) => {
       display: flex;
       align-items: center;
       justify-content: center;
+      border: 2px dashed #334155;
     }
-    #video, #canvas {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      border-radius: 16px;
-    }
-    #canvas { display: none; position: absolute; inset: 0; }
-    #photo-preview {
-      display: none;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      border-radius: 16px;
-      position: absolute;
-      inset: 0;
-    }
-    .controls {
+    #preview-wrap.has-photo { border-style: solid; border-color: #38bdf8; }
+    #photo-preview { width: 100%; height: 100%; object-fit: cover; display: none; }
+    #placeholder {
       display: flex;
-      gap: 20px;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
+      gap: 12px;
+      color: #475569;
+      font-size: 0.9rem;
+      text-align: center;
+      padding: 16px;
     }
-    #capture-btn {
-      width: 72px;
-      height: 72px;
+    #file-input { display: none; }
+    #camera-btn {
+      width: 80px; height: 80px;
       border-radius: 50%;
       background: white;
       border: 5px solid #38bdf8;
@@ -166,54 +156,50 @@ const serveMobilePage = async (req, res) => {
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 24px rgba(56,189,248,0.4);
-      transition: transform 0.1s, box-shadow 0.1s;
+      box-shadow: 0 4px 24px rgba(56,189,248,0.45);
+      transition: transform 0.12s, box-shadow 0.12s;
       flex-shrink: 0;
     }
-    #capture-btn:active { transform: scale(0.92); box-shadow: 0 2px 12px rgba(56,189,248,0.3); }
-    #capture-btn .inner {
-      width: 52px;
-      height: 52px;
+    #camera-btn:active { transform: scale(0.91); }
+    #camera-btn .inner {
+      width: 58px; height: 58px;
       background: #38bdf8;
       border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
     }
-    #retake-btn, #upload-btn, #close-btn {
-      padding: 12px 24px;
+    .controls { display: flex; gap: 16px; align-items: center; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      padding: 13px 28px;
       border-radius: 50px;
       font-size: 1rem;
       font-weight: 600;
       cursor: pointer;
       border: none;
-      transition: opacity 0.2s;
     }
     #retake-btn { background: #334155; color: #f1f5f9; display: none; }
     #upload-btn { background: #22c55e; color: white; display: none; }
-    #close-btn {
-      background: #ef4444;
-      color: white;
-      width: 100%;
-      max-width: 420px;
-    }
+    #close-btn { background: #ef4444; color: white; width: 100%; max-width: 420px; }
     #status {
-      font-size: 0.9rem;
+      font-size: 0.92rem;
       color: #94a3b8;
       text-align: center;
-      min-height: 40px;
+      min-height: 44px;
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 0 8px;
     }
-    #status.success { color: #4ade80; font-weight: 600; font-size: 1.05rem; }
+    #status.success { color: #4ade80; font-weight: 700; font-size: 1.05rem; }
     #status.error { color: #f87171; }
     .spinner {
       display: inline-block;
-      width: 20px;
-      height: 20px;
+      width: 20px; height: 20px;
       border: 3px solid rgba(148,163,184,0.3);
       border-top-color: #38bdf8;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       margin-right: 8px;
+      vertical-align: middle;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
@@ -221,92 +207,80 @@ const serveMobilePage = async (req, res) => {
 <body>
   <header>Subir foto para <span>${profName}</span></header>
   <div id="main">
+
     <div id="preview-wrap">
-      <video id="video" autoplay playsinline muted></video>
-      <canvas id="canvas"></canvas>
-      <img id="photo-preview" alt="Foto tomada" />
+      <div id="placeholder">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+        <span>Tocá el botón para abrir la cámara</span>
+      </div>
+      <img id="photo-preview" alt="Foto seleccionada" />
     </div>
+
+    <input id="file-input" type="file" accept="image/*" capture="environment" />
+
     <div class="controls">
-      <button id="capture-btn" title="Tomar foto"><div class="inner"></div></button>
-      <button id="retake-btn">↩ Retomar</button>
-      <button id="upload-btn">✓ Subir</button>
+      <button id="camera-btn" title="Abrir cámara">
+        <div class="inner">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        </div>
+      </button>
+      <button id="retake-btn" class="btn">↩ Otra foto</button>
+      <button id="upload-btn" class="btn">✓ Subir</button>
     </div>
-    <div id="status">Apuntá la cámara y presioná el botón.</div>
-    <button id="close-btn" onclick="window.close(); history.go(-1);">Cerrar</button>
+
+    <div id="status">Tocá el botón para sacar una foto.</div>
+    <button id="close-btn" class="btn" onclick="window.close(); history.go(-1);">Cerrar</button>
   </div>
 
   <script>
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
+    const fileInput    = document.getElementById('file-input');
     const photoPreview = document.getElementById('photo-preview');
-    const captureBtn = document.getElementById('capture-btn');
-    const retakeBtn = document.getElementById('retake-btn');
-    const uploadBtn = document.getElementById('upload-btn');
-    const status = document.getElementById('status');
-    let capturedBlob = null;
+    const placeholder  = document.getElementById('placeholder');
+    const previewWrap  = document.getElementById('preview-wrap');
+    const cameraBtn    = document.getElementById('camera-btn');
+    const retakeBtn    = document.getElementById('retake-btn');
+    const uploadBtn    = document.getElementById('upload-btn');
+    const status       = document.getElementById('status');
+    let selectedFile   = null;
 
-    // Start camera
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 960 } },
-          audio: false
-        });
-        video.srcObject = stream;
-      } catch (err) {
-        status.textContent = 'No se pudo acceder a la cámara: ' + err.message;
-        status.className = 'error';
-      }
-    }
+    cameraBtn.addEventListener('click', () => fileInput.click());
+    retakeBtn.addEventListener('click', () => fileInput.click());
 
-    function showCamera() {
-      video.style.display = 'block';
-      photoPreview.style.display = 'none';
-      captureBtn.style.display = 'flex';
-      retakeBtn.style.display = 'none';
-      uploadBtn.style.display = 'none';
-      capturedBlob = null;
-      status.textContent = 'Apuntá la cámara y presioná el botón.';
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      selectedFile = file;
+
+      photoPreview.src = URL.createObjectURL(file);
+      photoPreview.style.display = 'block';
+      placeholder.style.display = 'none';
+      previewWrap.classList.add('has-photo');
+
+      cameraBtn.style.display = 'none';
+      retakeBtn.style.display = 'flex';
+      uploadBtn.style.display = 'flex';
+      status.textContent = '¿Se ve bien? Podés sacar otra o subir la foto.';
       status.className = '';
-    }
-
-    captureBtn.addEventListener('click', () => {
-      const w = video.videoWidth || 1280;
-      const h = video.videoHeight || 960;
-      canvas.width = w;
-      canvas.height = h;
-      canvas.getContext('2d').drawImage(video, 0, 0, w, h);
-      canvas.toBlob(blob => {
-        capturedBlob = blob;
-        const url = URL.createObjectURL(blob);
-        photoPreview.src = url;
-        photoPreview.style.display = 'block';
-        video.style.display = 'none';
-        captureBtn.style.display = 'none';
-        retakeBtn.style.display = 'flex';
-        uploadBtn.style.display = 'flex';
-        status.textContent = '¿Se ve bien? Podés retomar o subir la foto.';
-      }, 'image/jpeg', 0.92);
     });
 
-    retakeBtn.addEventListener('click', showCamera);
-
     uploadBtn.addEventListener('click', async () => {
-      if (!capturedBlob) return;
+      if (!selectedFile) return;
       uploadBtn.disabled = true;
       retakeBtn.disabled = true;
       status.innerHTML = '<span class="spinner"></span>Subiendo...';
       status.className = '';
 
       const formData = new FormData();
-      const filename = 'foto_' + Date.now() + '.jpg';
-      formData.append('file', capturedBlob, filename);
+      formData.append('file', selectedFile, selectedFile.name || ('foto_' + Date.now() + '.jpg'));
 
       try {
-        const res = await fetch('${uploadUrl}', {
-          method: 'POST',
-          body: formData
-        });
+        const res = await fetch('${uploadUrl}', { method: 'POST', body: formData });
         const data = await res.json();
         if (res.ok) {
           status.textContent = '✓ Foto subida correctamente.';
@@ -325,8 +299,6 @@ const serveMobilePage = async (req, res) => {
         retakeBtn.disabled = false;
       }
     });
-
-    startCamera();
   </script>
 </body>
 </html>`);
@@ -334,7 +306,7 @@ const serveMobilePage = async (req, res) => {
 
 /**
  * POST /mobile-photo/upload
- * Receives the photo (memory storage buffer), validates the temp token, saves to S3 / local disk
+ * Receives the photo (memory storage buffer), validates the temp token, saves to S3 / local disk.
  */
 const handleMobilePhotoUpload = async (req, res) => {
   try {
@@ -343,7 +315,6 @@ const handleMobilePhotoUpload = async (req, res) => {
     const { token } = req.query;
     if (!token) return res.status(400).send({ error: 'Token requerido' });
 
-    // Check if token was already used
     if (usedTokens.has(token)) {
       return res.status(401).send({ error: 'Este enlace ya fue utilizado. Pedí un nuevo QR.' });
     }
@@ -383,7 +354,6 @@ const handleMobilePhotoUpload = async (req, res) => {
         },
         forcePathStyle: true,
       });
-
       const s3Key = `profesionales/${folderName}/${fileName}`;
       await s3.send(new PutObjectCommand({
         Bucket: bucketName,
@@ -391,7 +361,6 @@ const handleMobilePhotoUpload = async (req, res) => {
         Body: req.file.buffer,
         ContentType: req.file.mimetype || 'image/jpeg',
       }));
-
       fileUrl = `${process.env.ENDPOINT}/${bucketName}/${s3Key}`;
     } else {
       // --- Local disk save ---
@@ -399,19 +368,16 @@ const handleMobilePhotoUpload = async (req, res) => {
       const path = require('path');
       const uploadDir = path.join(__dirname, '../../uploads', 'profesionales', folderName);
       if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-      const filePath = path.join(uploadDir, fileName);
-      fs.writeFileSync(filePath, req.file.buffer);
+      fs.writeFileSync(path.join(uploadDir, fileName), req.file.buffer);
       const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
       fileUrl = `${baseUrl}/uploads/profesionales/${folderName}/${fileName}`;
     }
 
-    // Find or create a "Foto" doc type for mobile uploads
     let [photoDocType] = await ProfDocType.findOrCreate({
       where: { name: 'Foto' },
       defaults: { name: 'Foto', description: 'Foto tomada desde celular', status: true }
     });
 
-    // Create document record
     const doc = await ProfessionalDocument.create({
       professionalId,
       profDocTypeId: photoDocType.id,
@@ -421,11 +387,10 @@ const handleMobilePhotoUpload = async (req, res) => {
 
     const fullDoc = await ProfessionalDocument.findByPk(doc.id, { include: [ProfDocType] });
 
-    // Mark token as used (single-use within validity window)
     usedTokens.add(token);
     setTimeout(() => usedTokens.delete(token), 15 * 60 * 1000);
 
-    console.log('[MobileUpload] Success! Document id:', doc.id, 'fileUrl:', fileUrl);
+    console.log('[MobileUpload] Success! Document id:', doc.id);
     res.status(201).send(fullDoc);
   } catch (e) {
     console.error('[MobileUpload] ERROR:', e);
