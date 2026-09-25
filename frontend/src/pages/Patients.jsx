@@ -474,29 +474,23 @@ const Patients = () => {
     let sortableItems = [...patients];
     if (sortConfig !== null) {
       sortableItems.sort((a, b) => {
-        let aValue = a[sortConfig.key] || '';
-        let bValue = b[sortConfig.key] || '';
+        let aValue, bValue;
         if (sortConfig.key === 'firstName') {
-          aValue = `${a.lastName}, ${a.firstName}`.toLowerCase();
-          bValue = `${b.lastName}, ${b.firstName}`.toLowerCase();
+          aValue = `${a.lastName || ''}, ${a.firstName || ''}`;
+          bValue = `${b.lastName || ''}, ${b.firstName || ''}`;
         } else if (sortConfig.key === 'phone') {
-          aValue = aValue.toString();
-          bValue = bValue.toString();
+          aValue = (a.phone || '').toString();
+          bValue = (b.phone || '').toString();
         } else if (sortConfig.key === 'docNumber') {
-          aValue = aValue.toString();
-          bValue = bValue.toString();
+          aValue = (a.docNumber || '').toString();
+          bValue = (b.docNumber || '').toString();
         } else {
-           aValue = aValue.toString().toLowerCase();
-           bValue = bValue.toString().toLowerCase();
+          aValue = (a[sortConfig.key] || '').toString();
+          bValue = (b[sortConfig.key] || '').toString();
         }
 
-        if (aValue < bValue) {
-          return sortConfig.direction === 'asc' ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortConfig.direction === 'asc' ? 1 : -1;
-        }
-        return 0;
+        const cmp = aValue.localeCompare(bValue, 'es-AR', { sensitivity: 'base' });
+        return sortConfig.direction === 'asc' ? cmp : -cmp;
       });
     }
     return sortableItems;
