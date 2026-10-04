@@ -108,6 +108,8 @@ const Patients = () => {
   const [newTest, setNewTest] = useState({ testId: '', date: getLocalDate() });
   const [isLoadingTests, setIsLoadingTests] = useState(false);
   const [testSearchQuery, setTestSearchQuery] = useState('');
+  const [showPatientTestsModal, setShowPatientTestsModal] = useState(false);
+  const [selectedPatientForTests, setSelectedPatientForTests] = useState(null);
 
   // View Patient state
   const [showViewModal, setShowViewModal] = useState(false);
@@ -316,8 +318,10 @@ const Patients = () => {
   };
 
   const handleAddTest = async () => {
+    const targetPatientId = selectedPatientForTests?.id || editingId;
+    if (!targetPatientId) return;
     try {
-      const response = await api.post(`/patients/${editingId}/tests`, newTest);
+      const response = await api.post(`/patients/${targetPatientId}/tests`, newTest);
       setPatientTests([response.data, ...patientTests].sort((a, b) => new Date(b.date) - new Date(a.date)));
       setNewTest({ testId: '', date: getLocalDate() });
     } catch (err) {
@@ -326,14 +330,24 @@ const Patients = () => {
   };
 
   const handleDeleteTest = (testId) => {
+    const targetPatientId = selectedPatientForTests?.id || editingId;
+    if (!targetPatientId) return;
     showMsg('¿Está seguro de que desea eliminar esta prueba?', 'alert', async () => {
       try {
-        await api.delete(`/patients/${editingId}/tests/${testId}`);
+        await api.delete(`/patients/${targetPatientId}/tests/${testId}`);
         setPatientTests(patientTests.filter(pt => pt.id !== testId));
       } catch (err) {
         showMsg('Error al eliminar la prueba', 'alert');
       }
     });
+  };
+
+  const openPatientTestsModal = async (patient) => {
+    setSelectedPatientForTests(patient);
+    setNewTest({ testId: '', date: getLocalDate() });
+    setTestSearchQuery('');
+    fetchPatientTests(patient.id);
+    setShowPatientTestsModal(true);
   };
 
   const handleSubmit = async (e) => {
@@ -719,13 +733,6 @@ const Patients = () => {
               >
                 Dirección
               </button>
-              <button 
-                type="button"
-                onClick={() => setActiveTab('tests')}
-                style={{ background: 'none', border: 'none', padding: '10px 5px', cursor: 'pointer', borderBottom: activeTab === 'tests' ? '2px solid var(--primary)' : '2px solid transparent', fontWeight: activeTab === 'tests' ? 'bold' : 'normal', color: activeTab === 'tests' ? 'var(--primary)' : '#666' }}
-              >
-                Pruebas
-              </button>
             </div>
 
             <form onSubmit={handleSubmit} noValidate>
@@ -831,113 +838,6 @@ const Patients = () => {
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <div style={{ display: activeTab === 'tests' ? 'block' : 'none' }}>
-                {!editingId ? (
-                  <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: '#f9f9f9', borderRadius: '8px', color: '#666' }}>
-                    Para poder cargar pruebas, primero debes guardar el perfil de este nuevo paciente.
-                  </div>
-                ) : (
-                  <div>
-                    <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-                      <div style={{ flex: 1, position: 'relative' }}>
-                        <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px', color: '#666' }}>Prueba</label>
-                        <div 
-                          style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', backgroundColor: 'white', cursor: 'pointer', minHeight: '35px', display: 'flex', alignItems: 'center' }}
-                          onClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown === 'testSearch' ? null : 'testSearch'); }}
-                        >
-                           <span style={{ color: newTest.testId ? 'inherit' : '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                             {newTest.testId ? availableTests.find(t => t.id === newTest.testId)?.name : 'Seleccione una prueba...'}
-                           </span>
-                        </div>
-                        
-                        {activeDropdown === 'testSearch' && (
-                          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '6px', marginTop: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxHeight: '300px', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
-                            <div style={{ padding: '8px', borderBottom: '1px solid #eee' }}>
-                               <input 
-                                 type="text" 
-                                 autoFocus
-                                 placeholder="Buscar por nombre o descripción..."
-                                 value={testSearchQuery}
-                                 onChange={e => setTestSearchQuery(e.target.value)}
-                                 style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
-                               />
-                            </div>
-                            <div style={{ overflowY: 'auto' }}>
-                               {availableTests
-                                 .filter(t => 
-                                   t.name.toLowerCase().includes(testSearchQuery.toLowerCase()) || 
-                                   t.category.toLowerCase().includes(testSearchQuery.toLowerCase()) ||
-                                   (t.description && t.description.toLowerCase().includes(testSearchQuery.toLowerCase()))
-                                 )
-                                 .map(t => (
-                                 <div 
-                                   key={t.id} 
-                                   style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f9f9f9' }}
-                                   onClick={() => {
-                                      setNewTest({...newTest, testId: t.id});
-                                      setActiveDropdown(null);
-                                      setTestSearchQuery('');
-                                   }}
-                                 >
-                                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{t.name}</div>
-                                    <div style={{ fontSize: '0.75rem', color: '#666' }}>{t.category}</div>
-                                 </div>
-                               ))}
-                               {availableTests.filter(t => t.name.toLowerCase().includes(testSearchQuery.toLowerCase()) || t.category.toLowerCase().includes(testSearchQuery.toLowerCase()) || (t.description && t.description.toLowerCase().includes(testSearchQuery.toLowerCase()))).length === 0 && (
-                                 <div style={{ padding: '8px 12px', color: '#999', fontSize: '0.85rem', textAlign: 'center' }}>No se encontraron pruebas.</div>
-                               )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ width: '140px' }}>
-                        <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px', color: '#666' }}>Fecha</label>
-                        <input 
-                          type="date" 
-                          style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd' }}
-                          value={newTest.date}
-                          onChange={e => setNewTest({...newTest, date: e.target.value})}
-                          max={getLocalDate()}
-                        />
-                      </div>
-                      <button 
-                        type="button"
-                        className="btn btn-primary" 
-                        onClick={handleAddTest}
-                        disabled={!newTest.testId || !newTest.date}
-                      >
-                        Agregar
-                      </button>
-                    </div>
-
-                    <div style={{ border: '1px solid #eee', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto' }}>
-                      {isLoadingTests ? (
-                        <div style={{ padding: '1rem', textAlign: 'center', color: '#666' }}>Cargando pruebas...</div>
-                      ) : patientTests.length > 0 ? patientTests.map(pt => (
-                        <div key={pt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', borderBottom: '1px solid #eee' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <ClipboardList size={18} color="var(--primary)" />
-                            <div>
-                              <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: 'var(--primary)' }}>{pt.Test?.name}</div>
-                              <div style={{ fontSize: '0.8rem', color: '#666' }}>{pt.Test?.category} | {new Date(pt.date + 'T12:00:00').toLocaleDateString()}</div>
-                            </div>
-                          </div>
-                          {isAdmin && (
-                            <button type="button" onClick={() => handleDeleteTest(pt.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </div>
-                      )) : (
-                        <div style={{ padding: '1rem', textAlign: 'center', color: '#999', fontSize: '0.9rem' }}>
-                          No hay pruebas registradas.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
 
               <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1.5rem' }}>Guardar Paciente</button>
@@ -1058,12 +958,19 @@ const Patients = () => {
                     <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => openActivities(p)} title="Historia Clínica">
                       <Activity size={18} color="var(--light-blue)" />
                     </button>
+                    <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => openPatientTestsModal(p)} title="Pruebas">
+                      <ClipboardList size={18} color="#8b5cf6" />
+                    </button>
+                    <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => openSessions(p)} title="Sesiones">
+                      <Calendar size={18} color="var(--primary)" />
+                    </button>
                     
                     <div style={{ position: 'relative' }}>
                       <button 
                         className="btn" 
                         style={{ padding: '6px', background: 'transparent' }} 
                         onClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown === p.id ? null : p.id); }}
+                        title="Más opciones"
                       >
                         <MoreVertical size={18} color="#666" />
                       </button>
@@ -1071,22 +978,26 @@ const Patients = () => {
                       {activeDropdown === p.id && (
                         <div style={{
                           position: 'absolute', right: 0, top: '100%', backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '8px',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10, minWidth: '160px', padding: '8px 0'
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10, minWidth: '130px', padding: '4px 0'
                         }}>
-                          <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', transition: 'background 0.2s' }} onClick={() => { setActiveDropdown(null); openPatientDocsModal(p); }}>
-                            <FilePlus size={16} color="#95a5a6" /> <span style={{ fontSize: '0.9rem' }}>Documentos</span>
+                          <button 
+                            style={{ 
+                              width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', 
+                              display: 'flex', alignItems: 'center', gap: '10px', 
+                              cursor: isAdmin ? 'pointer' : 'not-allowed', 
+                              color: isAdmin ? '#ef4444' : '#bbb',
+                              transition: 'background 0.2s' 
+                            }} 
+                            onClick={() => { 
+                              if (isAdmin) {
+                                setActiveDropdown(null); 
+                                handleDeletePatient(p.id); 
+                              }
+                            }}
+                            title={isAdmin ? "Eliminar paciente" : "Solo administradores pueden borrar"}
+                          >
+                            <Trash2 size={16} /> <span style={{ fontSize: '0.9rem' }}>Borrar</span>
                           </button>
-                          <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', transition: 'background 0.2s' }} onClick={() => openSessions(p)}>
-                            <Calendar size={16} color="var(--primary)" /> <span style={{ fontSize: '0.9rem' }}>Sesiones</span>
-                          </button>
-                          {isAdmin && (
-                            <>
-                              <div style={{ borderTop: '1px solid #eee', margin: '4px 0' }}></div>
-                              <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', color: '#ef4444' }} onClick={() => handleDeletePatient(p.id)}>
-                                <Trash2 size={16} /> <span style={{ fontSize: '0.9rem' }}>Borrar</span>
-                              </button>
-                            </>
-                          )}
                         </div>
                       )}
                     </div>
@@ -1138,18 +1049,24 @@ const Patients = () => {
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid #eee', paddingTop: '1rem', marginTop: 'auto', alignItems: 'center' }}>
-                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555', fontSize: '0.85rem' }} onClick={() => openViewModal(p)}>
+              <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid #eee', paddingTop: '1rem', marginTop: 'auto', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button className="btn" style={{ flex: 1, minWidth: '55px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555', fontSize: '0.85rem' }} onClick={() => openViewModal(p)} title="Ver Detalles">
                   <Eye size={16} color="#4a90e2" /> Ver
                 </button>
-                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555', fontSize: '0.85rem' }} onClick={() => handleEdit(p)}>
+                <button className="btn" style={{ flex: 1, minWidth: '60px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555', fontSize: '0.85rem' }} onClick={() => handleEdit(p)} title="Editar Paciente">
                   <Edit3 size={16} color="#4a90e2" /> Editar
                 </button>
-                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555', fontSize: '0.85rem' }} onClick={() => openPatientDocsModal(p)} title="Documentos">
+                <button className="btn" style={{ flex: 1, minWidth: '58px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555', fontSize: '0.85rem' }} onClick={() => openPatientDocsModal(p)} title="Documentos">
                   <FilePlus size={16} color="#95a5a6" /> Docs
                 </button>
-                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555', fontSize: '0.85rem' }} onClick={() => openActivities(p)}>
+                <button className="btn" style={{ flex: 1, minWidth: '68px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555', fontSize: '0.85rem' }} onClick={() => openActivities(p)} title="Historia Clínica">
                   <Activity size={16} color="var(--light-blue)" /> H. Clín.
+                </button>
+                <button className="btn" style={{ flex: 1, minWidth: '68px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555', fontSize: '0.85rem' }} onClick={() => openPatientTestsModal(p)} title="Pruebas">
+                  <ClipboardList size={16} color="#8b5cf6" /> Pruebas
+                </button>
+                <button className="btn" style={{ flex: 1, minWidth: '68px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555', fontSize: '0.85rem' }} onClick={() => openSessions(p)} title="Sesiones">
+                  <Calendar size={16} color="var(--primary)" /> Sesiones
                 </button>
                 
                 <div style={{ position: 'relative' }}>
@@ -1157,6 +1074,7 @@ const Patients = () => {
                     className="btn" 
                     style={{ padding: '8px', border: '1px solid #eee', background: '#fcfcfc' }}
                     onClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown === p.id ? null : p.id); }}
+                    title="Más opciones"
                   >
                     <MoreVertical size={16} color="#666" />
                   </button>
@@ -1164,22 +1082,26 @@ const Patients = () => {
                   {activeDropdown === p.id && (
                     <div style={{
                       position: 'absolute', right: 0, bottom: '100%', backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '8px',
-                      boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', zIndex: 10, minWidth: '160px', padding: '8px 0', marginBottom: '8px'
+                      boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', zIndex: 10, minWidth: '130px', padding: '4px 0', marginBottom: '8px'
                     }}>
-                      <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => { setActiveDropdown(null); openPatientDocsModal(p); }}>
-                        <FilePlus size={16} color="#95a5a6" /> <span style={{ fontSize: '0.9rem' }}>Documentos</span>
+                      <button 
+                        style={{ 
+                          width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', 
+                          display: 'flex', alignItems: 'center', gap: '10px', 
+                          cursor: isAdmin ? 'pointer' : 'not-allowed', 
+                          color: isAdmin ? '#ef4444' : '#bbb',
+                          transition: 'background 0.2s'
+                        }} 
+                        onClick={() => { 
+                          if (isAdmin) {
+                            setActiveDropdown(null); 
+                            handleDeletePatient(p.id); 
+                          }
+                        }}
+                        title={isAdmin ? "Eliminar paciente" : "Solo administradores pueden borrar"}
+                      >
+                        <Trash2 size={16} /> <span style={{ fontSize: '0.9rem' }}>Borrar</span>
                       </button>
-                      <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => openSessions(p)}>
-                        <Calendar size={16} color="var(--primary)" /> <span style={{ fontSize: '0.9rem' }}>Sesiones</span>
-                      </button>
-                      {isAdmin && (
-                        <>
-                          <div style={{ borderTop: '1px solid #eee', margin: '4px 0' }}></div>
-                          <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', color: '#ef4444' }} onClick={() => handleDeletePatient(p.id)}>
-                            <Trash2 size={16} /> <span style={{ fontSize: '0.9rem' }}>Borrar</span>
-                          </button>
-                        </>
-                      )}
                     </div>
                   )}
                 </div>
@@ -1339,18 +1261,50 @@ const Patients = () => {
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(4px)'
         }}>
-          <div className="card" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
-            <button 
-              onClick={() => { setShowViewModal(false); setViewingPatient(null); }}
-              style={{ position: 'absolute', right: '20px', top: '20px', background: 'transparent', border: 'none', cursor: 'pointer' }}
-            >
-              <X size={24} />
-            </button>
-            <h2 style={{ marginBottom: '1.5rem', borderBottom: '2px solid #f0f0f0', paddingBottom: '10px' }}>
-              Detalle del Paciente
-            </h2>
+          <div className="card" style={{ 
+            width: '100%', 
+            maxWidth: '650px', 
+            maxHeight: '90vh', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            position: 'relative', 
+            padding: 0, 
+            overflow: 'hidden' 
+          }}>
+            {/* Header Fijo */}
+            <div style={{ 
+              padding: '1.2rem 1.5rem', 
+              borderBottom: '1px solid #eee', 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              backgroundColor: '#fff',
+              position: 'sticky',
+              top: 0,
+              zIndex: 10
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--dark-text)', display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span>Detalle del Paciente:</span>
+                <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
+                  {viewingPatient.lastName}, {viewingPatient.firstName}
+                </span>
+                {viewingPatient.isInactive && (
+                  <span style={{ fontSize: '0.7rem', backgroundColor: '#fee2e2', color: '#ef4444', padding: '2px 8px', borderRadius: '4px', border: '1px solid #fca5a5', fontWeight: 'bold' }}>
+                    INACTIVO
+                  </span>
+                )}
+              </h2>
+              <button 
+                onClick={() => { setShowViewModal(false); setViewingPatient(null); }}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#666', padding: '4px', marginLeft: '12px' }}
+                title="Cerrar"
+              >
+                <X size={22} />
+              </button>
+            </div>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {/* Contenido scrolleable */}
+            <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {/* Personal info section */}
               <div>
                 <h3 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '10px' }}>Datos Personales</h3>
@@ -1530,6 +1484,130 @@ const Patients = () => {
               )) : (
                 <div style={{ padding: '1rem', textAlign: 'center', color: '#999', fontSize: '0.9rem' }}>
                   No hay documentos cargados.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Patient Tests Modal */}
+      {showPatientTestsModal && selectedPatientForTests && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '650px', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+            <button 
+              onClick={() => { setShowPatientTestsModal(false); setSelectedPatientForTests(null); }} 
+              style={{ position: 'absolute', right: '15px', top: '15px', background: 'transparent', border: 'none', cursor: 'pointer' }}
+            >
+              <X />
+            </button>
+            <h2 style={{ marginBottom: '1.2rem', paddingRight: '36px' }}>
+              Pruebas de {selectedPatientForTests.firstName} {selectedPatientForTests.lastName}
+            </h2>
+
+            {/* Selector de nueva prueba */}
+            <div style={{ marginBottom: '1.5rem', background: '#f8f9fa', padding: '1.2rem', borderRadius: '10px', border: '1px solid #eee' }}>
+              <h4 style={{ margin: '0 0 12px 0', color: 'var(--primary)' }}>Asignar Nueva Prueba</h4>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '220px', position: 'relative' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px', color: '#666' }}>Prueba</label>
+                  <div 
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', backgroundColor: 'white', cursor: 'pointer', minHeight: '38px', display: 'flex', alignItems: 'center' }}
+                    onClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown === 'testSearch' ? null : 'testSearch'); }}
+                  >
+                     <span style={{ color: newTest.testId ? 'inherit' : '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                       {newTest.testId ? availableTests.find(t => t.id === newTest.testId)?.name : 'Seleccione una prueba...'}
+                     </span>
+                  </div>
+                  
+                  {activeDropdown === 'testSearch' && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '6px', marginTop: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxHeight: '250px', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+                      <div style={{ padding: '8px', borderBottom: '1px solid #eee' }}>
+                         <input 
+                           type="text" 
+                           autoFocus
+                           placeholder="Buscar por nombre o categoría..."
+                           value={testSearchQuery}
+                           onChange={e => setTestSearchQuery(e.target.value)}
+                           style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
+                         />
+                      </div>
+                      <div style={{ overflowY: 'auto' }}>
+                         {availableTests
+                           .filter(t => 
+                             t.name.toLowerCase().includes(testSearchQuery.toLowerCase()) || 
+                             t.category.toLowerCase().includes(testSearchQuery.toLowerCase()) ||
+                             (t.description && t.description.toLowerCase().includes(testSearchQuery.toLowerCase()))
+                           )
+                           .map(t => (
+                           <div 
+                             key={t.id} 
+                             style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f9f9f9', backgroundColor: newTest.testId === t.id ? '#f0f9ff' : 'white' }}
+                             onClick={() => {
+                                setNewTest({...newTest, testId: t.id});
+                                setActiveDropdown(null);
+                                setTestSearchQuery('');
+                             }}
+                           >
+                              <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{t.name}</div>
+                              <div style={{ fontSize: '0.75rem', color: '#666' }}>{t.category}</div>
+                           </div>
+                         ))}
+                         {availableTests.filter(t => t.name.toLowerCase().includes(testSearchQuery.toLowerCase()) || t.category.toLowerCase().includes(testSearchQuery.toLowerCase()) || (t.description && t.description.toLowerCase().includes(testSearchQuery.toLowerCase()))).length === 0 && (
+                           <div style={{ padding: '8px 12px', color: '#999', fontSize: '0.85rem', textAlign: 'center' }}>No se encontraron pruebas.</div>
+                         )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div style={{ width: '150px' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px', color: '#666' }}>Fecha</label>
+                  <input 
+                    type="date" 
+                    style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', height: '38px', boxSizing: 'border-box' }}
+                    value={newTest.date}
+                    onChange={e => setNewTest({...newTest, date: e.target.value})}
+                    max={getLocalDate()}
+                  />
+                </div>
+                <button 
+                  type="button"
+                  className="btn btn-primary" 
+                  onClick={handleAddTest}
+                  disabled={!newTest.testId || !newTest.date}
+                  style={{ height: '38px', padding: '0 18px', fontWeight: 600 }}
+                >
+                  Agregar
+                </button>
+              </div>
+            </div>
+
+            {/* Lista de pruebas */}
+            <h4>Pruebas Realizadas</h4>
+            <div style={{ border: '1px solid #eee', borderRadius: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+              {isLoadingTests ? (
+                <div style={{ padding: '1.5rem', textAlign: 'center', color: '#666' }}>Cargando pruebas...</div>
+              ) : patientTests.length > 0 ? patientTests.map(pt => (
+                <div key={pt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #eee' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <ClipboardList size={20} color="var(--primary)" />
+                    <div>
+                      <div style={{ fontWeight: 'bold', fontSize: '0.95rem', color: 'var(--primary)' }}>{pt.Test?.name}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '2px' }}>{pt.Test?.category} | {new Date(pt.date + 'T12:00:00').toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                  {isAdmin && (
+                    <button type="button" onClick={() => handleDeleteTest(pt.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '6px', borderRadius: '6px' }} title="Eliminar prueba">
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+              )) : (
+                <div style={{ padding: '2rem', textAlign: 'center', color: '#999', fontSize: '0.9rem' }}>
+                  No hay pruebas registradas para este paciente.
                 </div>
               )}
             </div>
