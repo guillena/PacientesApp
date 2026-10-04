@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { checkAndSendBirthdayEmails } = require('../utils/birthdayCron');
+const { getMimeType, getDocumentBuffer, convertDocToHtml } = require('../utils/docPreview');
 
 const createPatient = async (req, res) => {
   try {
@@ -199,6 +200,68 @@ const deletePatientDocument = async (req, res) => {
   }
 };
 
+const cropPatientDocument = async (req, res) => {
+  try {
+    const { id, docId } = req.params;
+    const file = req.file;
+    if (!file) {
+      return res.status(400).send({ error: 'No se recibió la imagen recortada' });
+    }
+
+    const doc = await PatientDocument.findOne({ where: { id: docId, patientId: id } });
+    if (!doc) {
+      return res.status(404).send({ error: 'Documento no encontrado' });
+    }
+
+    const oldUrl = doc.url;
+    const patient = await Patient.findByPk(id);
+    const folderName = patient ? patient.docNumber : id;
+
+    const baseUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+    const newUrl = file.location || `${baseUrl}/uploads/${folderName}/${file.filename}`;
+
+    const bucketName = process.env.BUCKET_NAME || process.env.BUCKET;
+    if (bucketName) {
+      try {
+        const { DeleteObjectCommand, S3Client } = require('@aws-sdk/client-s3');
+        const s3 = new S3Client({
+          region: process.env.REGION || 'us-east-1',
+          endpoint: process.env.ENDPOINT,
+          credentials: {
+            accessKeyId: process.env.ACCESS_KEY_ID,
+            secretAccessKey: process.env.SECRET_ACCESS_KEY,
+          },
+          forcePathStyle: true,
+        });
+        const urlObj = new URL(oldUrl);
+        let key = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
+        if (bucketName && key.startsWith(`${bucketName}/`)) key = key.substring(bucketName.length + 1);
+        if (key.startsWith('uploads/')) key = key.substring('uploads/'.length);
+        await s3.send(new DeleteObjectCommand({ Bucket: bucketName, Key: decodeURIComponent(key) }));
+      } catch (e) {
+        console.warn('Could not delete old S3 file:', e);
+      }
+    } else {
+      const oldRelativePath = oldUrl.replace(baseUrl, '').replace('/uploads/', '');
+      const oldFilePath = path.join(__dirname, '../../uploads', oldRelativePath);
+      const newFilePath = path.join(__dirname, '../../uploads', folderName, file.filename);
+      if (fs.existsSync(oldFilePath) && oldFilePath !== newFilePath) {
+        try { fs.unlinkSync(oldFilePath); } catch (e) {}
+      }
+    }
+
+    doc.url = newUrl;
+    doc.size = file.size;
+    doc.mimetype = file.mimetype;
+    await doc.save();
+
+    res.send(doc);
+  } catch (err) {
+    console.error('Error cropping patient document:', err);
+    res.status(500).send({ error: 'Error al guardar la imagen recortada' });
+  }
+};
+
 const deletePatient = async (req, res) => {
   try {
     const { id } = req.params;
@@ -311,7 +374,7 @@ const getPatientDocument = async (req, res) => {
     }
 
     // Determine type for correct response headers
-    const contentType = doc.url.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg';
+    const contentType = getMimeType(doc.originalName || doc.url);
     res.setHeader('Content-Type', contentType);
     const disposition = req.query.download === 'true' ? 'attachment' : 'inline';
     res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(doc.originalName)}"`);
@@ -436,6 +499,23 @@ const deletePatientTest = async (req, res) => {
   }
 };
 
+const getPatientDocumentPreview = async (req, res) => {
+  try {
+    const { docId } = req.params;
+    const doc = await PatientDocument.findByPk(docId);
+    if (!doc) {
+      return res.status(404).send({ error: 'Documento no encontrado' });
+    }
+
+    const buffer = await getDocumentBuffer(doc.url);
+    const result = await convertDocToHtml(buffer, doc.originalName || doc.url);
+    res.send(result);
+  } catch (err) {
+    console.error('ERROR GETTING PATIENT DOC PREVIEW:', err);
+    res.status(500).send({ error: 'Error al generar la vista previa del documento', details: err.message });
+  }
+};
+
 module.exports = {
   createPatient,
   getPatients,
@@ -444,8 +524,10 @@ module.exports = {
   getDocumentTypes,
   uploadPatientDocument,
   deletePatientDocument,
+  cropPatientDocument,
   deletePatient,
   getPatientDocument,
+  getPatientDocumentPreview,
   triggerBirthdayEmail,
   getPatientTests,
   addPatientTest,

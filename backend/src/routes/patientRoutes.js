@@ -1,8 +1,8 @@
 const express = require('express');
 const { 
   createPatient, getPatients, getPatient, updatePatient, 
-  getDocumentTypes, uploadPatientDocument, deletePatientDocument, 
-  deletePatient, getPatientDocument, triggerBirthdayEmail,
+  getDocumentTypes, uploadPatientDocument, deletePatientDocument, cropPatientDocument,
+  deletePatient, getPatientDocument, getPatientDocumentPreview, triggerBirthdayEmail,
   getPatientTests, addPatientTest, deletePatientTest
 } = require('../controllers/patientController');
 const { generatePatientPhotoToken } = require('../controllers/mobilePhotoController');
@@ -21,8 +21,10 @@ router.delete('/:id', auth, isAdmin, deletePatient);
 
 // Document handling endpoints
 router.post('/:id/documents', auth, upload.single('file'), uploadPatientDocument);
+router.post('/:id/documents/:docId/crop', auth, upload.single('file'), cropPatientDocument);
 router.delete('/:id/documents/:docId', auth, deletePatientDocument);
 router.get('/document/:docId/view', auth, getPatientDocument);
+router.get('/document/:docId/doc-preview', auth, getPatientDocumentPreview);
 
 // Test handling endpoints
 router.get('/:id/tests', auth, getPatientTests);

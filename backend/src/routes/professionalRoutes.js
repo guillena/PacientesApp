@@ -4,7 +4,7 @@ const { auth, isAdmin } = require('../middleware/auth');
 const router = express.Router();
 
 const upload = require('../middleware/upload');
-const { getDocuments, uploadDocument, deleteDocument, getProfessionalDocument } = require('../controllers/professionalDocumentController');
+const { getDocuments, uploadDocument, deleteDocument, cropProfessionalDocument, getProfessionalDocument, getProfessionalDocumentPreview } = require('../controllers/professionalDocumentController');
 const { generatePhotoToken } = require('../controllers/mobilePhotoController');
 
 router.post('/', auth, isAdmin, createProfessional);
@@ -15,8 +15,10 @@ router.delete('/:id', auth, isAdmin, deleteProfessional);
 
 // Document handling endpoints
 router.get('/documents/:documentId/view', auth, getProfessionalDocument);
+router.get('/documents/:documentId/doc-preview', auth, getProfessionalDocumentPreview);
 router.get('/:professionalId/documents', auth, isAdmin, getDocuments);
 router.post('/:professionalId/documents', auth, isAdmin, upload.single('file'), uploadDocument);
+router.post('/:professionalId/documents/:documentId/crop', auth, isAdmin, upload.single('file'), cropProfessionalDocument);
 router.delete('/:professionalId/documents/:documentId', auth, isAdmin, deleteDocument);
 
 // QR Photo upload token generation

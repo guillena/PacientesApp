@@ -3,10 +3,12 @@ import api from '../api';
 import { 
   Plus, Edit3, Trash2, X, Users, Settings, ChevronUp, ChevronDown, 
   Eye, EyeOff, Folder, Download, ClipboardList, Search, ChevronLeft, ChevronRight, FileText, Upload, File, FilePlus,
-  ZoomIn, ZoomOut, RotateCw, Maximize2, Minimize2, QrCode
+  ZoomIn, ZoomOut, RotateCw, Crop, Maximize2, Minimize2, QrCode
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import MessageModal from '../components/MessageModal';
+import WordDocumentViewer from '../components/WordDocumentViewer';
+import ImageCropperModal from '../components/ImageCropperModal';
 
 const provinces = [
   'Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Córdoba', 'Corrientes', 'Entre Ríos', 
@@ -71,17 +73,22 @@ const Admin = () => {
   // Document Viewer states
   const [showingDoc, setShowingDoc] = useState(null);
   const [imgZoom, setImgZoom] = useState(1);
+  const [docZoom, setDocZoom] = useState(1);
   const [imgRotation, setImgRotation] = useState(0);
   const [imgPan, setImgPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isDocMaximized, setIsDocMaximized] = useState(false);
+  const [showCropper, setShowCropper] = useState(false);
+  const [cropTimestamp, setCropTimestamp] = useState(Date.now());
 
   useEffect(() => {
     if (showingDoc) {
       setImgZoom(1);
+      setDocZoom(1);
       setImgRotation(0);
       setImgPan({ x: 0, y: 0 });
+      setShowCropper(false);
     }
   }, [showingDoc]);
 
@@ -431,6 +438,50 @@ const Admin = () => {
     } catch (err) {
       console.error('Error downloading file:', err);
       showMsg('Error al intentar descargar el documento.', 'alert');
+    }
+  };
+
+  const handleSaveProfCrop = async (croppedBlob) => {
+    try {
+      const profId = showingDoc?.professionalId || selectedProfForDocs?.id || viewingProf?.id;
+      if (!profId || !showingDoc) return;
+
+      const formData = new FormData();
+      const fileName = showingDoc.originalName || showingDoc.fileName || 'recorte.jpg';
+      formData.append('file', croppedBlob, fileName);
+
+      const res = await api.post(`/professionals/${profId}/documents/${showingDoc.id}/crop`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      const updatedDoc = {
+        ...res.data,
+        originalName: res.data.originalName || res.data.fileName,
+        fileUrl: res.data.fileUrl || res.data.fileName
+      };
+
+      setShowingDoc(updatedDoc);
+      setCropTimestamp(Date.now());
+      setImgZoom(1);
+      setImgRotation(0);
+      setImgPan({ x: 0, y: 0 });
+
+      // Update profDocs if present
+      setProfDocs(prev => prev.map(d => d.id === updatedDoc.id ? { ...d, ...updatedDoc } : d));
+
+      // Update viewingProf if present
+      if (viewingProf && viewingProf.ProfessionalDocuments) {
+        setViewingProf(prev => ({
+          ...prev,
+          ProfessionalDocuments: prev.ProfessionalDocuments.map(d => d.id === updatedDoc.id ? { ...d, ...updatedDoc } : d)
+        }));
+      }
+
+      setShowCropper(false);
+      fetchProfessionals();
+    } catch (err) {
+      console.error('Error cropping professional document:', err);
+      showMsg('Error al guardar el recorte de la imagen', 'alert');
     }
   };
 
@@ -1998,6 +2049,39 @@ const Admin = () => {
                     >
                       <RotateCw size={18} />
                     </button>
+                    <button 
+                      onClick={() => setShowCropper(true)}
+                      style={{ background: '#f0f0f0', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#555' }}
+                      title="Recortar y Guardar"
+                    >
+                      <Crop size={18} />
+                    </button>
+                  </div>
+                )}
+                {/* Word documents (.doc, .docx) zoom controls */}
+                {((showingDoc.fileUrl || '').toLowerCase().match(/\.(docx?)$/) || (showingDoc.originalName || '').toLowerCase().match(/\.(docx?)$/)) && (
+                  <div style={{ display: 'flex', gap: '5px', marginRight: '10px', paddingRight: '10px', borderRight: '1px solid #ddd', alignItems: 'center' }}>
+                    <button 
+                      onClick={() => setDocZoom(prev => Math.max(Math.round((prev - 0.1) * 10) / 10, 0.5))}
+                      style={{ background: '#f0f0f0', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#555' }}
+                      title="Alejar"
+                    >
+                      <ZoomOut size={18} />
+                    </button>
+                    <span 
+                      onClick={() => setDocZoom(1)}
+                      style={{ fontSize: '0.8rem', color: '#666', minWidth: '42px', textAlign: 'center', userSelect: 'none', cursor: 'pointer', fontWeight: '500' }}
+                      title="Click para restablecer al 100%"
+                    >
+                      {Math.round(docZoom * 100)}%
+                    </span>
+                    <button 
+                      onClick={() => setDocZoom(prev => Math.min(Math.round((prev + 0.1) * 10) / 10, 2.5))}
+                      style={{ background: '#f0f0f0', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#555' }}
+                      title="Acercar"
+                    >
+                      <ZoomIn size={18} />
+                    </button>
                   </div>
                 )}
                 <button 
@@ -2017,7 +2101,7 @@ const Admin = () => {
                 </button>
 
                 <button 
-                  onClick={() => { setShowingDoc(null); setIsDocMaximized(false); setImgZoom(1); setImgRotation(0); setImgPan({ x: 0, y: 0 }); }}
+                  onClick={() => { setShowingDoc(null); setIsDocMaximized(false); setImgZoom(1); setDocZoom(1); setImgRotation(0); setImgPan({ x: 0, y: 0 }); setShowCropper(false); }}
                   style={{ background: '#fee2e2', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#ef4444' }}
                 >
                   <X size={18} />
@@ -2065,7 +2149,7 @@ const Admin = () => {
               }}
             >
               {(() => {
-                const previewUrl = `${api.defaults.baseURL}/professionals/documents/${showingDoc.id}/view?token=${localStorage.getItem('token')}`;
+                const previewUrl = `${api.defaults.baseURL}/professionals/documents/${showingDoc.id}/view?token=${localStorage.getItem('token')}&t=${cropTimestamp}`;
                 
                 if (showingDoc.fileUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/)) {
                   return <img 
@@ -2094,6 +2178,22 @@ const Admin = () => {
                   );
                 } 
 
+                // Documentos Word (.doc, .docx)
+                const docNameLower = (showingDoc.originalName || showingDoc.fileUrl || '').toLowerCase();
+                if (docNameLower.match(/\.(docx?)$/)) {
+                  return (
+                    <WordDocumentViewer 
+                      fileUrl={showingDoc.fileUrl}
+                      fileName={showingDoc.originalName || 'Documento Word'}
+                      docId={showingDoc.id}
+                      type="professional"
+                      zoom={docZoom}
+                      onZoomChange={setDocZoom}
+                      onDownload={() => handleDownload(showingDoc)}
+                    />
+                  );
+                }
+
                 return <div style={{ textAlign: 'center', padding: '3rem', color: 'white' }}>
                     <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📄</div>
                     <p style={{ fontSize: '1.1rem' }}>Vista previa no disponible para este tipo de archivo.</p>
@@ -2109,6 +2209,18 @@ const Admin = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Image Cropper Modal */}
+      {showCropper && showingDoc && (
+        <ImageCropperModal
+          isOpen={showCropper}
+          imageUrl={`${api.defaults.baseURL}/professionals/documents/${showingDoc.id}/view?token=${localStorage.getItem('token')}&t=${cropTimestamp}`}
+          fileName={showingDoc.originalName || showingDoc.fileName || 'recorte'}
+          initialRotation={imgRotation}
+          onSave={handleSaveProfCrop}
+          onCancel={() => setShowCropper(false)}
+        />
       )}
 
       {/* Message Modal */}

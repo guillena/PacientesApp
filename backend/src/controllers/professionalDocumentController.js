@@ -1,6 +1,7 @@
 const { ProfessionalDocument, ProfDocType, Professional } = require('../models');
 const fs = require('fs');
 const path = require('path');
+const { getMimeType, getDocumentBuffer, convertDocToHtml } = require('../utils/docPreview');
 
 const getDocuments = async (req, res) => {
   try {
@@ -109,6 +110,67 @@ const deleteDocument = async (req, res) => {
   }
 };
 
+const cropProfessionalDocument = async (req, res) => {
+  try {
+    const { professionalId, documentId } = req.params;
+    const file = req.file;
+    if (!file) {
+      return res.status(400).send({ error: 'No se recibió la imagen recortada' });
+    }
+
+    const doc = await ProfessionalDocument.findOne({ where: { id: documentId, professionalId } });
+    if (!doc) {
+      return res.status(404).send({ error: 'Documento no encontrado' });
+    }
+
+    const oldUrl = doc.fileUrl;
+    const prof = await Professional.findByPk(professionalId);
+    const folderName = prof ? prof.username : professionalId;
+
+    const baseUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+    const newUrl = file.location || `${baseUrl}/uploads/profesionales/${folderName}/${file.filename}`;
+
+    const bucketName = process.env.BUCKET_NAME || process.env.BUCKET;
+    if (bucketName) {
+      try {
+        const { DeleteObjectCommand, S3Client } = require('@aws-sdk/client-s3');
+        const s3 = new S3Client({
+          region: process.env.REGION || 'us-east-1',
+          endpoint: process.env.ENDPOINT,
+          credentials: {
+            accessKeyId: process.env.ACCESS_KEY_ID,
+            secretAccessKey: process.env.SECRET_ACCESS_KEY,
+          },
+          forcePathStyle: true,
+        });
+        const urlObj = new URL(oldUrl);
+        let key = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
+        if (bucketName && key.startsWith(`${bucketName}/`)) key = key.substring(bucketName.length + 1);
+        if (key.startsWith('uploads/')) key = key.substring('uploads/'.length);
+        await s3.send(new DeleteObjectCommand({ Bucket: bucketName, Key: decodeURIComponent(key) }));
+      } catch (e) {
+        console.warn('Could not delete old S3 file:', e);
+      }
+    } else {
+      const oldRelativePath = oldUrl.replace(baseUrl, '').replace('/uploads/', '');
+      const oldFilePath = path.join(__dirname, '../../uploads', oldRelativePath);
+      const newFilePath = path.join(__dirname, '../../uploads/profesionales', folderName, file.filename);
+      if (fs.existsSync(oldFilePath) && oldFilePath !== newFilePath) {
+        try { fs.unlinkSync(oldFilePath); } catch (e) {}
+      }
+    }
+
+    doc.fileUrl = newUrl;
+    await doc.save();
+
+    const updated = await ProfessionalDocument.findByPk(doc.id, { include: [ProfDocType] });
+    res.send(updated);
+  } catch (err) {
+    console.error('Error cropping professional document:', err);
+    res.status(500).send({ error: 'Error al guardar la imagen recortada' });
+  }
+};
+
 const getProfessionalDocument = async (req, res) => {
   try {
     const { documentId } = req.params;
@@ -118,7 +180,7 @@ const getProfessionalDocument = async (req, res) => {
       return res.status(404).send({ error: 'Documento no encontrado' });
     }
 
-    const contentType = doc.fileUrl.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg';
+    const contentType = getMimeType(doc.originalName || doc.fileUrl);
     res.setHeader('Content-Type', contentType);
     const disposition = req.query.download === 'true' ? 'attachment' : 'inline';
     res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(doc.originalName)}"`);
@@ -175,10 +237,29 @@ const getProfessionalDocument = async (req, res) => {
   }
 };
 
+const getProfessionalDocumentPreview = async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    const doc = await ProfessionalDocument.findByPk(documentId);
+    if (!doc) {
+      return res.status(404).send({ error: 'Documento no encontrado' });
+    }
+
+    const buffer = await getDocumentBuffer(doc.fileUrl);
+    const result = await convertDocToHtml(buffer, doc.originalName || doc.fileUrl);
+    res.send(result);
+  } catch (err) {
+    console.error('ERROR GETTING PROFESSIONAL DOC PREVIEW:', err);
+    res.status(500).send({ error: 'Error al generar la vista previa del documento', details: err.message });
+  }
+};
+
 module.exports = {
   getDocuments,
   uploadDocument,
   deleteDocument,
-  getProfessionalDocument
+  cropProfessionalDocument,
+  getProfessionalDocument,
+  getProfessionalDocumentPreview
 };
 
