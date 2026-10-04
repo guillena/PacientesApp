@@ -80,21 +80,60 @@ sequelize.sync().then(async () => {
   
   // Automatic safe column migration for Appointments table
   try {
-    const queryInterface = sequelize.getQueryInterface();
-    const tableDescription = await queryInterface.describeTable('Appointments');
-    if (!tableDescription.confirmed) {
-      await queryInterface.addColumn('Appointments', 'confirmed', {
-        type: require('sequelize').DataTypes.BOOLEAN,
-        defaultValue: false
-      });
-      console.log('[Migration] Added column "confirmed" to Appointments table successfully');
+    const isPostgres = sequelize.getDialect() === 'postgres';
+    if (isPostgres) {
+      const appCols = ['confirmed', 'paid', 'attended'];
+      for (const col of appCols) {
+        try {
+          await sequelize.query(`ALTER TABLE "Appointments" ADD COLUMN IF NOT EXISTS "${col}" BOOLEAN DEFAULT FALSE;`);
+        } catch (e) {
+          try {
+            await sequelize.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS ${col} BOOLEAN DEFAULT FALSE;`);
+          } catch (e2) {}
+        }
+      }
     }
-    if (!tableDescription.paid) {
-      await queryInterface.addColumn('Appointments', 'paid', {
-        type: require('sequelize').DataTypes.BOOLEAN,
-        defaultValue: false
+
+    const queryInterface = sequelize.getQueryInterface();
+    let tableDescription = null;
+    let targetTableName = 'Appointments';
+    try {
+      tableDescription = await queryInterface.describeTable('Appointments');
+      targetTableName = 'Appointments';
+    } catch (e) {
+      try {
+        tableDescription = await queryInterface.describeTable('appointments');
+        targetTableName = 'appointments';
+      } catch (e2) {}
+    }
+
+    if (tableDescription) {
+      const colMap = {};
+      Object.keys(tableDescription).forEach(k => {
+        colMap[k.toLowerCase()] = true;
       });
-      console.log('[Migration] Added column "paid" to Appointments table successfully');
+
+      if (!colMap['confirmed']) {
+        await queryInterface.addColumn(targetTableName, 'confirmed', {
+          type: require('sequelize').DataTypes.BOOLEAN,
+          defaultValue: false
+        });
+        console.log(`[Migration] Added column "confirmed" to ${targetTableName} table successfully`);
+      }
+      if (!colMap['paid']) {
+        await queryInterface.addColumn(targetTableName, 'paid', {
+          type: require('sequelize').DataTypes.BOOLEAN,
+          defaultValue: false
+        });
+        console.log(`[Migration] Added column "paid" to ${targetTableName} table successfully`);
+      }
+      if (!colMap['attended']) {
+        await queryInterface.addColumn(targetTableName, 'attended', {
+          type: require('sequelize').DataTypes.BOOLEAN,
+          defaultValue: false
+        });
+        console.log(`[Migration] Added column "attended" to ${targetTableName} table successfully`);
+      }
     }
 
     // Automatic safe column migration for Professionals table (address & personal fields)
