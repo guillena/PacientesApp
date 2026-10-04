@@ -286,7 +286,7 @@ const ImageCropperModal = ({
       inset: 0,
       backgroundColor: 'rgba(15, 23, 42, 0.85)',
       backdropFilter: 'blur(8px)',
-      zIndex: 1250,
+      zIndex: 1400,
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'center',

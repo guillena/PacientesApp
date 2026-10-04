@@ -5,8 +5,9 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import api from '../api';
 import { useAuth } from '../store/AuthContext';
-import { X, Trash2, CheckCircle2, CheckCheck, DollarSign } from 'lucide-react';
+import { X, Trash2, CheckCircle2, CheckCheck, DollarSign, Eye } from 'lucide-react';
 import MessageModal from '../components/MessageModal';
+import PatientDetailModal from '../components/PatientDetailModal';
 
 const Agenda = () => {
   const { user } = useAuth();
@@ -19,6 +20,8 @@ const Agenda = () => {
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
+  const [showPatientDetailModal, setShowPatientDetailModal] = useState(false);
+  const [selectedPatientDetail, setSelectedPatientDetail] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [deleteFuture, setDeleteFuture] = useState(false);
   const [confirmDeleteModal, setConfirmDeleteModal] = useState(false);
@@ -547,7 +550,35 @@ const Agenda = () => {
               {/* Row 1: Paciente & Prestación */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>Paciente</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                    <label style={{ fontSize: '0.9rem', margin: 0, fontWeight: 500 }}>Paciente</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (formData.patientId) {
+                          const pat = patients.find(p => p.id === formData.patientId);
+                          setSelectedPatientDetail(pat || formData.patientId);
+                          setShowPatientDetailModal(true);
+                        }
+                      }}
+                      disabled={!formData.patientId}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: formData.patientId ? 'pointer' : 'default',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '2px',
+                        color: formData.patientId ? '#4a90e2' : '#ccc',
+                        transition: 'color 0.2s',
+                        borderRadius: '4px'
+                      }}
+                      title={formData.patientId ? "Ver detalle del paciente" : "Seleccione un paciente para ver su detalle"}
+                    >
+                      <Eye size={16} />
+                    </button>
+                  </div>
                   <select 
                     className="form-control" 
                     value={formData.patientId} 
@@ -766,6 +797,18 @@ const Agenda = () => {
         onClose={executeDelete}
         onCancel={() => setConfirmDeleteModal(false)}
       />
+
+      {/* Patient Detail Modal */}
+      {showPatientDetailModal && selectedPatientDetail && (
+        <PatientDetailModal
+          isOpen={showPatientDetailModal}
+          patient={selectedPatientDetail}
+          onClose={() => {
+            setShowPatientDetailModal(false);
+            setSelectedPatientDetail(null);
+          }}
+        />
+      )}
 
     </div>
   );

@@ -3,6 +3,8 @@ import api from '../api';
 import { Search, UserPlus, Edit3, X, ArrowUpDown, ArrowUp, ArrowDown, Activity, List, Grid, Eye, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCw, Crop, FileText, FilePlus, Trash2, Calendar, CheckCircle2, MoreVertical, ClipboardList, Upload, Mic, MicOff, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import MessageModal from '../components/MessageModal';
+import PatientDetailModal from '../components/PatientDetailModal';
+import WhatsAppIcon, { getWhatsAppUrl } from '../components/WhatsAppIcon';
 import WordDocumentViewer from '../components/WordDocumentViewer';
 import ImageCropperModal from '../components/ImageCropperModal';
 import { useAuth } from '../store/AuthContext';
@@ -324,6 +326,7 @@ const Patients = () => {
       const response = await api.post(`/patients/${targetPatientId}/tests`, newTest);
       setPatientTests([response.data, ...patientTests].sort((a, b) => new Date(b.date) - new Date(a.date)));
       setNewTest({ testId: '', date: getLocalDate() });
+      fetchPatients();
     } catch (err) {
       showMsg('Error al agregar la prueba', 'alert');
     }
@@ -336,6 +339,7 @@ const Patients = () => {
       try {
         await api.delete(`/patients/${targetPatientId}/tests/${testId}`);
         setPatientTests(patientTests.filter(pt => pt.id !== testId));
+        fetchPatients();
       } catch (err) {
         showMsg('Error al eliminar la prueba', 'alert');
       }
@@ -633,6 +637,7 @@ const Patients = () => {
       });
       setActivities([response.data, ...activities]);
       setNewActivityDesc('');
+      fetchPatients();
     } catch (err) {
       showMsg('Error al agregar actividad.', 'alert');
     }
@@ -662,6 +667,7 @@ const Patients = () => {
       try {
         await api.delete(`/activities/${id}`);
         setActivities(activities.filter(act => act.id !== id));
+        fetchPatients();
       } catch (err) {
         showMsg('Error al eliminar actividad.', 'alert');
       }
@@ -920,11 +926,19 @@ const Patients = () => {
           <tbody>
             {filteredPatients.length > 0 ? filteredPatients.map(p => (
               <tr key={p.id} style={{ borderBottom: '1px solid var(--soft-gray)', transition: 'background 0.2s' }}>
-                <td style={{ padding: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {p.lastName}, {p.firstName}
-                  {p.PatientDocuments && p.PatientDocuments.length > 0 && (
-                    <FileText size={16} color="#666" style={{ flexShrink: 0, marginLeft: '4px' }} title="Tiene documentos" />
-                  )}
+                <td style={{ padding: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>{p.lastName}, {p.firstName}</span>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginLeft: '4px' }}>
+                    {p.PatientDocuments && p.PatientDocuments.length > 0 && (
+                      <FileText size={16} color="#666" style={{ flexShrink: 0 }} title="Tiene documentos" />
+                    )}
+                    {p.Activities && p.Activities.length > 0 && (
+                      <Activity size={16} color="var(--light-blue)" style={{ flexShrink: 0 }} title="Tiene historia clínica" />
+                    )}
+                    {p.PatientTests && p.PatientTests.length > 0 && (
+                      <ClipboardList size={16} color="#8b5cf6" style={{ flexShrink: 0 }} title="Tiene pruebas" />
+                    )}
+                  </div>
                   {p.isInactive && <span style={{ fontSize: '0.7rem', backgroundColor: '#fee2e2', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', border: '1px solid #fca5a5' }}>INACTIVO</span>}
                 </td>
                 <td style={{ padding: '1rem' }}>
@@ -932,7 +946,20 @@ const Patients = () => {
                   <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '2px' }}>{p.DocumentType?.name || 'S/D'}</div>
                 </td>
                 <td style={{ padding: '1rem' }}>
-                  <div style={{ fontSize: '0.85rem' }}>{formatPhone(p.phone)}</div>
+                  <div style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>{formatPhone(p.phone)}</span>
+                    {p.phone && getWhatsAppUrl(p.phone) && (
+                      <a 
+                        href={getWhatsAppUrl(p.phone)} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}
+                        title="Abrir WhatsApp Web"
+                      >
+                        <WhatsAppIcon size={16} />
+                      </a>
+                    )}
+                  </div>
                   <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>{p.email || 'Sin email'}</div>
                 </td>
                 <td style={{ padding: '1rem', textAlign: 'center' }}>
@@ -1021,11 +1048,19 @@ const Patients = () => {
                   INACTIVO
                 </span>
               )}
-              <h3 style={{ margin: '0 0 1rem 0', paddingRight: '60px', color: 'var(--dark-text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {p.lastName}, {p.firstName}
-                {p.PatientDocuments && p.PatientDocuments.length > 0 && (
-                  <FileText size={18} color="#666" style={{ flexShrink: 0 }} title="Tiene documentos" />
-                )}
+              <h3 style={{ margin: '0 0 1rem 0', paddingRight: '60px', color: 'var(--dark-text)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span>{p.lastName}, {p.firstName}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  {p.PatientDocuments && p.PatientDocuments.length > 0 && (
+                    <FileText size={18} color="#666" style={{ flexShrink: 0 }} title="Tiene documentos" />
+                  )}
+                  {p.Activities && p.Activities.length > 0 && (
+                    <Activity size={18} color="var(--light-blue)" style={{ flexShrink: 0 }} title="Tiene historia clínica" />
+                  )}
+                  {p.PatientTests && p.PatientTests.length > 0 && (
+                    <ClipboardList size={18} color="#8b5cf6" style={{ flexShrink: 0 }} title="Tiene pruebas" />
+                  )}
+                </span>
               </h3>
               
               <div style={{ marginBottom: '1.2rem', flex: 1 }}>
@@ -1034,7 +1069,21 @@ const Patients = () => {
                   <span>{formatDocument(p.docNumber)} ({p.DocumentType?.name || 'S/D'})</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: '#555', fontSize: '0.9rem' }}>
-                  <span style={{ fontWeight: 'bold', minWidth: '85px', color: '#444' }}>Teléfono:</span> {formatPhone(p.phone)}
+                  <span style={{ fontWeight: 'bold', minWidth: '85px', color: '#444' }}>Teléfono:</span> 
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <span>{formatPhone(p.phone)}</span>
+                    {p.phone && getWhatsAppUrl(p.phone) && (
+                      <a 
+                        href={getWhatsAppUrl(p.phone)} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', color: '#25D366' }}
+                        title="Abrir WhatsApp Web"
+                      >
+                        <WhatsAppIcon size={16} />
+                      </a>
+                    )}
+                  </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: '#555', fontSize: '0.9rem' }}>
                   <span style={{ fontWeight: 'bold', minWidth: '70px', color: '#444' }}>Email:</span> {p.email || 'N/A'}
@@ -1123,7 +1172,7 @@ const Patients = () => {
         }}>
           <div className="card" style={{ width: '100%', maxWidth: '600px', position: 'relative', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <button 
-              onClick={() => { stopDictation(); setShowActivitiesModal(false); setSelectedPatient(null); setNewActivityDesc(''); }}
+              onClick={() => { stopDictation(); setShowActivitiesModal(false); setSelectedPatient(null); setNewActivityDesc(''); fetchPatients(); }}
               style={{ position: 'absolute', right: '20px', top: '20px', background: 'transparent', border: 'none', cursor: 'pointer' }}
             >
               <X size={24} />
@@ -1257,135 +1306,13 @@ const Patients = () => {
 
       {/* Read-Only Patient View Modal */}
       {showViewModal && viewingPatient && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(4px)'
-        }}>
-          <div className="card" style={{ 
-            width: '100%', 
-            maxWidth: '650px', 
-            maxHeight: '90vh', 
-            display: 'flex', 
-            flexDirection: 'column', 
-            position: 'relative', 
-            padding: 0, 
-            overflow: 'hidden' 
-          }}>
-            {/* Header Fijo */}
-            <div style={{ 
-              padding: '1.2rem 1.5rem', 
-              borderBottom: '1px solid #eee', 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              backgroundColor: '#fff',
-              position: 'sticky',
-              top: 0,
-              zIndex: 10
-            }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--dark-text)', display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                <span>Detalle del Paciente:</span>
-                <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
-                  {viewingPatient.lastName}, {viewingPatient.firstName}
-                </span>
-                {viewingPatient.isInactive && (
-                  <span style={{ fontSize: '0.7rem', backgroundColor: '#fee2e2', color: '#ef4444', padding: '2px 8px', borderRadius: '4px', border: '1px solid #fca5a5', fontWeight: 'bold' }}>
-                    INACTIVO
-                  </span>
-                )}
-              </h2>
-              <button 
-                onClick={() => { setShowViewModal(false); setViewingPatient(null); }}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#666', padding: '4px', marginLeft: '12px' }}
-                title="Cerrar"
-              >
-                <X size={22} />
-              </button>
-            </div>
-            
-            {/* Contenido scrolleable */}
-            <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {/* Personal info section */}
-              <div>
-                <h3 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '10px' }}>Datos Personales</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px' }}>
-                   <p style={{ margin: 0 }}><strong>Nombre:</strong> {viewingPatient.firstName}</p>
-                   <p style={{ margin: 0 }}><strong>Apellido:</strong> {viewingPatient.lastName}</p>
-                   <p style={{ margin: 0 }}><strong>Documento:</strong> {formatDocument(viewingPatient.docNumber)} ({viewingPatient.DocumentType?.name || 'S/D'})</p>
-                   <p style={{ margin: 0 }}><strong>Teléfono:</strong> {formatPhone(viewingPatient.phone)}</p>
-                   <p style={{ margin: 0 }}><strong>Email:</strong> {viewingPatient.email || 'N/A'}</p>
-                   <p style={{ margin: 0 }}><strong>Fecha de Nac.:</strong> {viewingPatient.birthDate || 'N/A'}</p>
-                   {viewingPatient.isInactive && <p style={{ margin: 0, color: '#ef4444', fontWeight: 'bold', gridColumn: '1 / -1', marginTop: '8px' }}>ESTADO: INACTIVO</p>}
-                </div>
-              </div>
-
-              {/* Address section */}
-              <div>
-                <h3 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '10px' }}>Dirección</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px' }}>
-                   <p style={{ margin: 0, gridColumn: '1 / -1' }}><strong>Calle y Nro:</strong> {viewingPatient.street || 'N/A'} {viewingPatient.number || ''}</p>
-                   <p style={{ margin: 0 }}><strong>Piso:</strong> {viewingPatient.floor || 'N/A'}</p>
-                   <p style={{ margin: 0 }}><strong>Depto:</strong> {viewingPatient.apartment || 'N/A'}</p>
-                   <p style={{ margin: 0 }}><strong>Ciudad:</strong> {viewingPatient.city || 'N/A'}</p>
-                   <p style={{ margin: 0 }}><strong>Provincia:</strong> {viewingPatient.province || 'N/A'}</p>
-                   <p style={{ margin: 0 }}><strong>C. Postal:</strong> {viewingPatient.postalCode || 'N/A'}</p>
-                </div>
-              </div>
-
-              {/* Documents section */}
-              <div>
-                <h3 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '10px' }}>Documentos</h3>
-                <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '15px', backgroundColor: '#f9f9f9' }}>
-                  {viewingPatient.PatientDocuments && viewingPatient.PatientDocuments.length > 0 ? (
-                    <ul style={{ margin: 0, paddingLeft: '20px' }}>
-                      {viewingPatient.PatientDocuments.map(doc => (
-                        <li key={doc.id} style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <button 
-                            type="button" 
-                            onClick={() => setShowingDoc(doc)}
-                            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--light-blue)', textDecoration: 'none', fontWeight: 'bold', cursor: 'pointer', textAlign: 'left' }}
-                          >
-                            {doc.originalName}
-                          </button>
-                          {doc.isConformity && (
-                            <span style={{ fontSize: '0.65rem', background: '#0369a1', color: 'white', padding: '1px 6px', borderRadius: '8px', textTransform: 'uppercase', fontWeight: 'bold' }}>
-                               C. Conformidad
-                            </span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p style={{ margin: 0, color: '#888', fontStyle: 'italic' }}>No hay documentos cargados.</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Tests section */}
-              <div>
-                <h3 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '10px' }}>Pruebas Realizadas</h3>
-                <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '15px', backgroundColor: '#f9f9f9', maxHeight: '200px', overflowY: 'auto' }}>
-                  {isLoadingTests ? (
-                    <p style={{ margin: 0, color: '#888', fontStyle: 'italic' }}>Cargando pruebas...</p>
-                  ) : patientTests && patientTests.length > 0 ? (
-                    <ul style={{ margin: 0, paddingLeft: '20px' }}>
-                      {patientTests.map(pt => (
-                        <li key={pt.id} style={{ marginBottom: '8px' }}>
-                          <span style={{ fontWeight: 'bold' }}>{pt.Test?.name}</span>
-                          <span style={{ color: '#666', fontSize: '0.9rem', marginLeft: '8px' }}>
-                            ({pt.Test?.category}) - {new Date(pt.date + 'T12:00:00').toLocaleDateString()}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p style={{ margin: 0, color: '#888', fontStyle: 'italic' }}>No hay pruebas registradas.</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PatientDetailModal
+          isOpen={showViewModal}
+          patient={viewingPatient}
+          onClose={() => { setShowViewModal(false); setViewingPatient(null); }}
+          tests={patientTests}
+          isLoadingTests={isLoadingTests}
+        />
       )}
 
       {/* Patient Documents Modal */}
@@ -1499,7 +1426,7 @@ const Patients = () => {
         }}>
           <div className="card" style={{ width: '100%', maxWidth: '650px', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
             <button 
-              onClick={() => { setShowPatientTestsModal(false); setSelectedPatientForTests(null); }} 
+              onClick={() => { setShowPatientTestsModal(false); setSelectedPatientForTests(null); fetchPatients(); }} 
               style={{ position: 'absolute', right: '15px', top: '15px', background: 'transparent', border: 'none', cursor: 'pointer' }}
             >
               <X />
@@ -1683,7 +1610,7 @@ const Patients = () => {
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', flexDirection: 'column', 
-          justifyContent: 'center', alignItems: 'center', zIndex: 1100, backdropFilter: 'blur(6px)'
+          justifyContent: 'center', alignItems: 'center', zIndex: 1300, backdropFilter: 'blur(6px)'
         }}>
           <div style={{ 
             backgroundColor: 'white', 

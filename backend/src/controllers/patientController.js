@@ -41,7 +41,9 @@ const getPatients = async (req, res) => {
       ],
       include: [
         { model: DocumentType },
-        { model: PatientDocument }
+        { model: PatientDocument },
+        { model: Activity, attributes: ['id'] },
+        { model: PatientTest, attributes: ['id'] }
       ]
     });
     res.send(patients);
@@ -55,7 +57,9 @@ const getPatient = async (req, res) => {
     const patient = await Patient.findByPk(req.params.id, {
       include: [
         { model: DocumentType },
-        { model: PatientDocument }
+        { model: PatientDocument },
+        { model: Activity, attributes: ['id'] },
+        { model: PatientTest, attributes: ['id'] }
       ]
     });
     if (!patient) {
