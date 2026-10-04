@@ -1,4 +1,5 @@
-const { Patient, DocumentType, PatientDocument, Appointment, Activity, Test, PatientTest } = require('../models');
+const { Patient, DocumentType, PatientDocument, Appointment, Activity, Test, PatientTest, Professional, PatientProfessional } = require('../models');
+const { Op } = require('sequelize');
 const fs = require('fs');
 const path = require('path');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
@@ -7,13 +8,41 @@ const { getMimeType, getDocumentBuffer, convertDocToHtml } = require('../utils/d
 
 const createPatient = async (req, res) => {
   try {
-    const data = { ...req.body };
+    const { professionalIds, ...data } = req.body;
     // Evitar error en PostgreSQL con fechas vacías o inválidas
     if (data.birthDate === '' || data.birthDate === 'Invalid date') {
       data.birthDate = null;
     }
     const patient = await Patient.create(data);
-    res.status(201).send(patient);
+
+    // Asignar profesionales: si viene array en el body, usarlo.
+    // Si no viene o está vacío y el creador es rol profesional, asignar al profesional que lo crea.
+    let targetProfIds = [];
+    if (Array.isArray(professionalIds) && professionalIds.length > 0) {
+      targetProfIds = professionalIds;
+    } else if (req.professional?.role !== 'admin' && req.professional?.id) {
+      targetProfIds = [req.professional.id];
+    }
+
+    if (targetProfIds.length > 0) {
+      await patient.setProfessionals(targetProfIds);
+    }
+
+    const createdPatient = await Patient.findByPk(patient.id, {
+      include: [
+        { model: DocumentType },
+        { model: PatientDocument },
+        { model: Activity, attributes: ['id'] },
+        { model: PatientTest, attributes: ['id'] },
+        {
+          model: Professional,
+          attributes: ['id', 'firstName', 'lastName', 'username', 'role', 'color'],
+          through: { attributes: [] }
+        }
+      ]
+    });
+
+    res.status(201).send(createdPatient);
   } catch (e) {
     console.error('SERVER ERROR CREATE PATIENT:', e);
     
@@ -34,7 +63,22 @@ const createPatient = async (req, res) => {
 
 const getPatients = async (req, res) => {
   try {
+    const userRole = req.professional?.role;
+    const userId = req.professional?.id;
+    const includeAll = req.query.all === 'true' || userRole === 'admin';
+
+    const where = {};
+    if (!includeAll) {
+      const assigned = await PatientProfessional.findAll({
+        where: { professionalId: userId },
+        attributes: ['patientId']
+      });
+      const assignedPatientIds = assigned.map(a => a.patientId);
+      where.id = { [Op.in]: assignedPatientIds };
+    }
+
     const patients = await Patient.findAll({
+      where,
       order: [
         ['lastName', 'ASC'],
         ['firstName', 'ASC']
@@ -43,11 +87,17 @@ const getPatients = async (req, res) => {
         { model: DocumentType },
         { model: PatientDocument },
         { model: Activity, attributes: ['id'] },
-        { model: PatientTest, attributes: ['id'] }
+        { model: PatientTest, attributes: ['id'] },
+        {
+          model: Professional,
+          attributes: ['id', 'firstName', 'lastName', 'username', 'role', 'color'],
+          through: { attributes: [] }
+        }
       ]
     });
     res.send(patients);
   } catch (e) {
+    console.error('SERVER ERROR GET PATIENTS:', e);
     res.status(500).send();
   }
 };
@@ -59,7 +109,12 @@ const getPatient = async (req, res) => {
         { model: DocumentType },
         { model: PatientDocument },
         { model: Activity, attributes: ['id'] },
-        { model: PatientTest, attributes: ['id'] }
+        { model: PatientTest, attributes: ['id'] },
+        {
+          model: Professional,
+          attributes: ['id', 'firstName', 'lastName', 'username', 'role', 'color'],
+          through: { attributes: [] }
+        }
       ]
     });
     if (!patient) {
@@ -67,6 +122,7 @@ const getPatient = async (req, res) => {
     }
     res.send(patient);
   } catch (e) {
+    console.error('SERVER ERROR GET PATIENT:', e);
     res.status(500).send();
   }
 };
@@ -77,13 +133,37 @@ const updatePatient = async (req, res) => {
     if (!patient) {
       return res.status(404).send();
     }
-    const data = { ...req.body };
+    const { professionalIds, ...data } = req.body;
+    console.log(`[UPDATE PATIENT] ID: ${req.params.id} | User: ${req.professional?.username} (${req.professional?.role})`);
+    console.log(`[UPDATE PATIENT] Received professionalIds:`, professionalIds);
+
     // Evitar error en PostgreSQL con fechas vacías o inválidas
     if (data.birthDate === '' || data.birthDate === 'Invalid date') {
       data.birthDate = null;
     }
     await patient.update(data);
-    res.send(patient);
+
+    // Solo el administrador puede modificar la asignación de profesionales a un paciente
+    if (req.professional?.role === 'admin' && Array.isArray(professionalIds)) {
+      console.log(`[UPDATE PATIENT] Admin is updating professionalIds:`, professionalIds);
+      await patient.setProfessionals(professionalIds);
+    }
+
+    const updatedPatient = await Patient.findByPk(patient.id, {
+      include: [
+        { model: DocumentType },
+        { model: PatientDocument },
+        { model: Activity, attributes: ['id'] },
+        { model: PatientTest, attributes: ['id'] },
+        {
+          model: Professional,
+          attributes: ['id', 'firstName', 'lastName', 'username', 'role', 'color'],
+          through: { attributes: [] }
+        }
+      ]
+    });
+
+    res.send(updatedPatient);
   } catch (e) {
     console.error('SERVER ERROR UPDATE PATIENT:', e);
 
@@ -358,6 +438,7 @@ const deletePatient = async (req, res) => {
     await Activity.destroy({ where: { patientId: id } });
     await PatientDocument.destroy({ where: { patientId: id } });
     await PatientTest.destroy({ where: { patientId: id } });
+    await PatientProfessional.destroy({ where: { patientId: id } });
 
     // 3. Final Patient Delete
     await patient.destroy();

@@ -17,7 +17,7 @@ const activityRoutes = require('./src/routes/activityRoutes');
 const taskRoutes = require('./src/routes/taskRoutes');
 const testRoutes = require('./src/routes/testRoutes');
 const profDocTypeRoutes = require('./src/routes/profDocTypeRoutes');
-const { Test, ProfDocType } = require('./src/models');
+const { Test, ProfDocType, Patient, Professional, PatientProfessional } = require('./src/models');
 const { seedTests } = require('./src/utils/seedTests');
 const upload = require('./src/middleware/upload');
 
@@ -148,6 +148,28 @@ sequelize.sync().then(async () => {
     }
   } catch (profDocErr) {
     console.error('[Auto-seed ProfDocType error]', profDocErr.message);
+  }
+
+  // Auto-seed PatientProfessional if empty
+  try {
+    const relCount = await PatientProfessional.count();
+    if (relCount === 0) {
+      console.log('[Auto-seed] Asignando pacientes existentes a profesionales...');
+      const existingPatients = await Patient.findAll();
+      const existingProfessionals = await Professional.findAll();
+      const pairs = [];
+      for (const p of existingPatients) {
+        for (const prof of existingProfessionals) {
+          pairs.push({ patientId: p.id, professionalId: prof.id });
+        }
+      }
+      if (pairs.length > 0) {
+        await PatientProfessional.bulkCreate(pairs, { ignoreDuplicates: true });
+        console.log(`[Auto-seed] Asignados ${existingPatients.length} pacientes a ${existingProfessionals.length} profesionales (${pairs.length} relaciones).`);
+      }
+    }
+  } catch (profSeedErr) {
+    console.error('[Auto-seed PatientProfessional error]', profSeedErr.message);
   }
 
   initBirthdayCron();

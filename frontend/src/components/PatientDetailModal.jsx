@@ -178,6 +178,28 @@ const PatientDetailModal = ({ isOpen, patient, onClose, onViewDocument, tests, i
             </div>
           </div>
 
+          {/* Assigned professionals section */}
+          {patientData.Professionals && patientData.Professionals.length > 0 && (
+            <div>
+              <h3 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '10px' }}>Profesionales Asignados</h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', backgroundColor: '#f9f9f9', padding: '12px 15px', borderRadius: '8px' }}>
+                {patientData.Professionals.map(prof => (
+                  <span key={prof.id} style={{
+                    backgroundColor: '#eff6ff',
+                    color: '#1d4ed8',
+                    padding: '4px 12px',
+                    borderRadius: '16px',
+                    fontSize: '0.85rem',
+                    fontWeight: '500',
+                    border: '1px solid #bfdbfe'
+                  }}>
+                    {prof.lastName}, {prof.firstName}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Documents section */}
           <div>
             <h3 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '10px' }}>Documentos</h3>

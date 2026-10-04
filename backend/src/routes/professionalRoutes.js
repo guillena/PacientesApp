@@ -8,7 +8,7 @@ const { getDocuments, uploadDocument, deleteDocument, cropProfessionalDocument, 
 const { generatePhotoToken } = require('../controllers/mobilePhotoController');
 
 router.post('/', auth, isAdmin, createProfessional);
-router.get('/', auth, isAdmin, getProfessionals);
+router.get('/', auth, getProfessionals);
 router.get('/download-all', auth, isAdmin, downloadAllFiles);
 router.patch('/:id', auth, isAdmin, updateProfessional);
 router.delete('/:id', auth, isAdmin, deleteProfessional);

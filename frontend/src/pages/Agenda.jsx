@@ -54,7 +54,7 @@ const Agenda = () => {
   const fetchDependencies = async () => {
     try {
       const [pts, bnts] = await Promise.all([
-        api.get('/patients'),
+        api.get('/patients?all=true'),
         api.get('/benefits')
       ]);
       const sortedPatients = (pts.data || []).sort((a, b) => {
@@ -74,7 +74,11 @@ const Agenda = () => {
       const currentYear = new Date().getFullYear();
 
       const bdays = [];
-      pts.data.forEach(p => {
+      const birthdayPatients = user.role === 'admin'
+        ? pts.data
+        : pts.data.filter(p => p.Professionals?.some(prof => prof.id === user.id));
+
+      birthdayPatients.forEach(p => {
         if (!p.birthDate || p.isInactive) return;
         const datePart = p.birthDate.split('T')[0];
         const [, month, day] = datePart.split('-');
@@ -182,18 +186,30 @@ const Agenda = () => {
     const startDate = arg.date;
     const endDate = new Date(startDate.getTime() + 30 * 60000);
 
-    const activePatients = patients
-      .filter(p => !p.isInactive)
-      .sort((a, b) => {
-        const nameA = `${a.lastName || ''}, ${a.firstName || ''}`.trim();
-        const nameB = `${b.lastName || ''}, ${b.firstName || ''}`.trim();
-        return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
-      });
+    const activePatients = patients.filter(p => !p.isInactive);
+    let defaultPatientId = '';
+    const sortByName = (a, b) => {
+      const nameA = `${a.lastName || ''}, ${a.firstName || ''}`.trim();
+      const nameB = `${b.lastName || ''}, ${b.firstName || ''}`.trim();
+      return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+    };
+
+    if (user.role === 'admin') {
+      const sorted = [...activePatients].sort(sortByName);
+      defaultPatientId = sorted.length > 0 ? sorted[0].id : '';
+    } else {
+      const myActive = activePatients.filter(p => p.Professionals?.some(pr => pr.id === user.id)).sort(sortByName);
+      if (myActive.length > 0) {
+        defaultPatientId = myActive[0].id;
+      } else if (activePatients.length > 0) {
+        defaultPatientId = [...activePatients].sort(sortByName)[0].id;
+      }
+    }
 
     setEditingId(null);
     setDeleteFuture(false);
     setFormData({
-      patientId: activePatients.length > 0 ? activePatients[0].id : '',
+      patientId: defaultPatientId,
       benefitId: benefits.length > 0 ? benefits[0].id : '',
       professionalId: user.role === 'admin' && professionals.length > 0 ? professionals[0].id : user.id,
       date: startDate.toISOString().split('T')[0],
@@ -587,15 +603,48 @@ const Agenda = () => {
                     style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: 'white' }}
                   >
                     <option value="" disabled>Seleccione un paciente</option>
-                    {patients
-                      .filter(p => !p.isInactive || p.id === formData.patientId)
-                      .sort((a, b) => {
-                        const nameA = `${a.lastName || ''}, ${a.firstName || ''}`.trim();
-                        const nameB = `${b.lastName || ''}, ${b.firstName || ''}`.trim();
-                        return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
-                      })
-                      .map(p => <option key={p.id} value={p.id}>{p.lastName}, {p.firstName}</option>)
-                    }
+                    {user.role === 'admin' ? (
+                      patients
+                        .filter(p => !p.isInactive || p.id === formData.patientId)
+                        .sort((a, b) => {
+                          const nameA = `${a.lastName || ''}, ${a.firstName || ''}`.trim();
+                          const nameB = `${b.lastName || ''}, ${b.firstName || ''}`.trim();
+                          return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+                        })
+                        .map(p => <option key={p.id} value={p.id}>{p.lastName}, {p.firstName}</option>)
+                    ) : (
+                      (() => {
+                        const available = patients.filter(p => !p.isInactive || p.id === formData.patientId);
+                        const isMyPatient = (p) => p.Professionals?.some(prof => prof.id === user.id);
+                        const sortByName = (a, b) => {
+                          const nameA = `${a.lastName || ''}, ${a.firstName || ''}`.trim();
+                          const nameB = `${b.lastName || ''}, ${b.firstName || ''}`.trim();
+                          return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+                        };
+
+                        const myPatients = available.filter(isMyPatient).sort(sortByName);
+                        const otherPatients = available.filter(p => !isMyPatient(p)).sort(sortByName);
+
+                        return (
+                          <>
+                            {myPatients.length > 0 && (
+                              <optgroup label="Mis Pacientes">
+                                {myPatients.map(p => (
+                                  <option key={p.id} value={p.id}>{p.lastName}, {p.firstName}</option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {otherPatients.length > 0 && (
+                              <optgroup label="Otros Pacientes">
+                                {otherPatients.map(p => (
+                                  <option key={p.id} value={p.id}>{p.lastName}, {p.firstName}</option>
+                                ))}
+                              </optgroup>
+                            )}
+                          </>
+                        );
+                      })()
+                    )}
                   </select>
                 </div>
 

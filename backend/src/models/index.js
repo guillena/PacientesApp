@@ -12,6 +12,7 @@ const Test = require('./Test');
 const PatientTest = require('./PatientTest');
 const ProfDocType = require('./ProfDocType');
 const ProfessionalDocument = require('./ProfessionalDocument');
+const PatientProfessional = require('./PatientProfessional');
 
 // Associations
 
@@ -73,6 +74,22 @@ ProfessionalDocument.belongsTo(Professional, { foreignKey: 'professionalId' });
 ProfDocType.hasMany(ProfessionalDocument, { foreignKey: 'profDocTypeId', onDelete: 'RESTRICT' });
 ProfessionalDocument.belongsTo(ProfDocType, { foreignKey: 'profDocTypeId' });
 
+// Patient <-> Professional (Many-to-Many)
+Patient.belongsToMany(Professional, { 
+  through: PatientProfessional, 
+  foreignKey: 'patientId', 
+  otherKey: 'professionalId' 
+});
+Professional.belongsToMany(Patient, { 
+  through: PatientProfessional, 
+  foreignKey: 'professionalId', 
+  otherKey: 'patientId' 
+});
+Patient.hasMany(PatientProfessional, { foreignKey: 'patientId', onDelete: 'CASCADE' });
+PatientProfessional.belongsTo(Patient, { foreignKey: 'patientId' });
+Professional.hasMany(PatientProfessional, { foreignKey: 'professionalId', onDelete: 'CASCADE' });
+PatientProfessional.belongsTo(Professional, { foreignKey: 'professionalId' });
+
 module.exports = {
   sequelize,
   Benefit,
@@ -86,5 +103,6 @@ module.exports = {
   Test,
   PatientTest,
   ProfDocType,
-  ProfessionalDocument
+  ProfessionalDocument,
+  PatientProfessional
 };

@@ -64,6 +64,7 @@ const Patients = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [docTypes, setDocTypes] = useState([]);
+  const [professionals, setProfessionals] = useState([]);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -79,7 +80,8 @@ const Patients = () => {
     city: '',
     postalCode: '',
     docTypeId: '',
-    isInactive: false
+    isInactive: false,
+    professionalIds: []
   });
   const [editingId, setEditingId] = useState(null);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
@@ -272,7 +274,22 @@ const Patients = () => {
     fetchPatients();
     fetchDocTypes();
     fetchAvailableTests();
+    fetchProfessionals();
   }, []);
+
+  const fetchProfessionals = async () => {
+    try {
+      const response = await api.get('/professionals');
+      const sorted = (response.data || []).sort((a, b) => {
+        const nameA = `${a.lastName || ''}, ${a.firstName || ''}`.trim();
+        const nameB = `${b.lastName || ''}, ${b.firstName || ''}`.trim();
+        return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+      });
+      setProfessionals(sorted);
+    } catch (err) {
+      console.error('Error fetching professionals', err);
+    }
+  };
 
   const fetchAvailableTests = async () => {
     try {
@@ -373,16 +390,28 @@ const Patients = () => {
       setShowModal(false);
       setEditingId(null);
       setFormData({
-        firstName: '', lastName: '', docNumber: '', email: '', phone: '', birthDate: '', street: '', number: '', floor: '', apartment: '', province: '', city: '', postalCode: '', docTypeId: '', isInactive: false
+        firstName: '', lastName: '', docNumber: '', email: '', phone: '', birthDate: '', street: '', number: '', floor: '', apartment: '', province: '', city: '', postalCode: '', docTypeId: '', isInactive: false, professionalIds: []
       });
-      fetchPatients();
+      await fetchPatients();
     } catch (err) {
       const msg = err.response?.data?.error || 'Error al guardar el paciente. Verifique los datos.';
       showMsg(msg, 'alert');
     }
   };
 
-  const handleEdit = (patient) => {
+  const handleToggleProfessional = (profId) => {
+    if (editingId && !isAdmin) return;
+    setFormData(prev => {
+      const current = prev.professionalIds || [];
+      const updated = current.includes(profId)
+        ? current.filter(id => id !== profId)
+        : [...current, profId];
+      return { ...prev, professionalIds: updated };
+    });
+  };
+
+  const handleEdit = async (patient) => {
+    const profIds = (patient.Professionals || []).map(p => p.id);
     setFormData({
       firstName: patient.firstName,
       lastName: patient.lastName,
@@ -398,13 +427,26 @@ const Patients = () => {
       city: patient.city || '',
       postalCode: patient.postalCode || '',
       docTypeId: patient.docTypeId || (docTypes.length > 0 ? docTypes[0].id : ''),
-      isInactive: patient.isInactive || false
+      isInactive: patient.isInactive || false,
+      professionalIds: profIds
     });
     setPatientDocs(patient.PatientDocuments || []);
     setEditingId(patient.id);
     setActiveTab('personal');
     fetchPatientTests(patient.id);
     setShowModal(true);
+
+    try {
+      const { data: fresh } = await api.get(`/patients/${patient.id}`);
+      if (fresh && fresh.Professionals) {
+        setFormData(prev => ({
+          ...prev,
+          professionalIds: fresh.Professionals.map(p => p.id)
+        }));
+      }
+    } catch (e) {
+      console.warn('Could not fetch fresh patient details:', e);
+    }
   };
 
   const openCreateModal = () => {
@@ -414,7 +456,8 @@ const Patients = () => {
     setFormData({
       firstName: '', lastName: '', docNumber: '', email: '', phone: '', birthDate: '', street: '', number: '', floor: '', apartment: '', province: '', city: '', postalCode: '',
       docTypeId: docTypes.length > 0 ? docTypes[0].id : '',
-      isInactive: false
+      isInactive: false,
+      professionalIds: (!isAdmin && user?.id) ? [user.id] : []
     });
     setActiveTab('personal');
     setShowModal(true);
@@ -793,6 +836,63 @@ const Patients = () => {
                     <input type="date" max={getLocalDate()} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }} value={formData.birthDate || ''} onChange={e => setFormData({...formData, birthDate: e.target.value})} />
                   </div>
                 </div>
+                {/* Profesionales Asignados */}
+                <div style={{ marginBottom: '1.5rem', backgroundColor: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155', margin: 0 }}>
+                      Profesionales Asignados
+                    </label>
+                    {editingId && !isAdmin && (
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>
+                        Solo el administrador puede editar la asignación
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '8px' }}>
+                    {professionals.map(prof => {
+                      const isChecked = (formData.professionalIds || []).includes(prof.id);
+                      const isDisabled = editingId && !isAdmin;
+                      return (
+                        <div 
+                          key={prof.id} 
+                          onClick={() => {
+                            if (!isDisabled) handleToggleProfessional(prof.id);
+                          }}
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '8px', 
+                            fontSize: '0.85rem', 
+                            padding: '6px 10px', 
+                            borderRadius: '6px', 
+                            border: isChecked ? '1px solid #93c5fd' : '1px solid #e2e8f0',
+                            backgroundColor: isChecked ? '#eff6ff' : '#fff',
+                            cursor: isDisabled ? 'not-allowed' : 'pointer',
+                            opacity: isDisabled && !isChecked ? 0.5 : 1,
+                            transition: 'all 0.15s ease',
+                            userSelect: 'none'
+                          }}
+                        >
+                          <input 
+                            type="checkbox" 
+                            checked={isChecked} 
+                            disabled={isDisabled}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleToggleProfessional(prof.id);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ cursor: isDisabled ? 'not-allowed' : 'pointer' }}
+                          />
+                          <span style={{ fontWeight: isChecked ? 600 : 400, color: isChecked ? '#1e3a8a' : '#1e293b' }}>
+                            {prof.lastName}, {prof.firstName}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div style={{ marginBottom: '2rem' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', cursor: 'pointer', backgroundColor: '#fdfdfd', padding: '10px', borderRadius: '8px', border: '1px solid #eee' }}>
                     <input type="checkbox" checked={formData.isInactive} onChange={e => setFormData({...formData, isInactive: e.target.checked})} style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
@@ -926,20 +1026,39 @@ const Patients = () => {
           <tbody>
             {filteredPatients.length > 0 ? filteredPatients.map(p => (
               <tr key={p.id} style={{ borderBottom: '1px solid var(--soft-gray)', transition: 'background 0.2s' }}>
-                <td style={{ padding: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>{p.lastName}, {p.firstName}</span>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginLeft: '4px' }}>
-                    {p.PatientDocuments && p.PatientDocuments.length > 0 && (
-                      <FileText size={16} color="#666" style={{ flexShrink: 0 }} title="Tiene documentos" />
-                    )}
-                    {p.Activities && p.Activities.length > 0 && (
-                      <Activity size={16} color="var(--light-blue)" style={{ flexShrink: 0 }} title="Tiene historia clínica" />
-                    )}
-                    {p.PatientTests && p.PatientTests.length > 0 && (
-                      <ClipboardList size={16} color="#8b5cf6" style={{ flexShrink: 0 }} title="Tiene pruebas" />
-                    )}
+                <td style={{ padding: '1rem', fontWeight: 'bold' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>{p.lastName}, {p.firstName}</span>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginLeft: '4px' }}>
+                      {p.PatientDocuments && p.PatientDocuments.length > 0 && (
+                        <FileText size={16} color="#666" style={{ flexShrink: 0 }} title="Tiene documentos" />
+                      )}
+                      {p.Activities && p.Activities.length > 0 && (
+                        <Activity size={16} color="var(--light-blue)" style={{ flexShrink: 0 }} title="Tiene historia clínica" />
+                      )}
+                      {p.PatientTests && p.PatientTests.length > 0 && (
+                        <ClipboardList size={16} color="#8b5cf6" style={{ flexShrink: 0 }} title="Tiene pruebas" />
+                      )}
+                    </div>
+                    {p.isInactive && <span style={{ fontSize: '0.7rem', backgroundColor: '#fee2e2', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', border: '1px solid #fca5a5' }}>INACTIVO</span>}
                   </div>
-                  {p.isInactive && <span style={{ fontSize: '0.7rem', backgroundColor: '#fee2e2', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', border: '1px solid #fca5a5' }}>INACTIVO</span>}
+                  {p.Professionals && p.Professionals.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                      {p.Professionals.map(prof => (
+                        <span key={prof.id} style={{
+                          fontSize: '0.7rem',
+                          backgroundColor: '#f1f5f9',
+                          color: '#475569',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          border: '1px solid #e2e8f0',
+                          fontWeight: 'normal'
+                        }}>
+                          {prof.lastName}, {prof.firstName}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </td>
                 <td style={{ padding: '1rem' }}>
                   <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--dark-text)' }}>{formatDocument(p.docNumber)}</div>
@@ -1092,8 +1211,27 @@ const Patients = () => {
                   <span style={{ fontWeight: 'bold', minWidth: '70px', color: '#444' }}>C. Inf.:</span> {p.PatientDocuments?.some(d => d.isConformity) ? '✅ Cargado' : '❌ Pendiente'}
                 </div>
                 {(p.city || p.province || p.street) && (
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', color: '#555', fontSize: '0.9rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px', color: '#555', fontSize: '0.9rem' }}>
                     <span style={{ fontWeight: 'bold', minWidth: '70px', color: '#444' }}>Ciudad:</span> {p.city || p.province || p.street}
+                  </div>
+                )}
+                {p.Professionals && p.Professionals.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', color: '#555', fontSize: '0.9rem' }}>
+                    <span style={{ fontWeight: 'bold', minWidth: '85px', color: '#444' }}>Profesionales:</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {p.Professionals.map(prof => (
+                        <span key={prof.id} style={{
+                          fontSize: '0.75rem',
+                          backgroundColor: '#eff6ff',
+                          color: '#1d4ed8',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          border: '1px solid #bfdbfe'
+                        }}>
+                          {prof.lastName}, {prof.firstName}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
