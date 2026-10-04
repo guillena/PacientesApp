@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { Search, UserPlus, Edit3, X, ArrowUpDown, ArrowUp, ArrowDown, Activity, List, Grid, Eye, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCw, Crop, FileText, Trash2, Calendar, CheckCircle2, MoreVertical, ClipboardList, Upload, Mic, MicOff, QrCode } from 'lucide-react';
+import { Search, UserPlus, Edit3, X, ArrowUpDown, ArrowUp, ArrowDown, Activity, List, Grid, Eye, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCw, Crop, FileText, FilePlus, Trash2, Calendar, CheckCircle2, MoreVertical, ClipboardList, Upload, Mic, MicOff, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import MessageModal from '../components/MessageModal';
 import WordDocumentViewer from '../components/WordDocumentViewer';
@@ -138,18 +138,36 @@ const Patients = () => {
   const [isConformityChecked, setIsConformityChecked] = useState(false);
   const [docUploadFile, setDocUploadFile] = useState(null);
 
+  // Patient Documents Modal states
+  const [selectedPatientForDocs, setSelectedPatientForDocs] = useState(null);
+  const [showPatientDocsModal, setShowPatientDocsModal] = useState(false);
+
+  const openPatientDocsModal = async (patient) => {
+    setSelectedPatientForDocs(patient);
+    setDocUploadFile(null);
+    setIsConformityChecked(false);
+    try {
+      const { data } = await api.get(`/patients/${patient.id}`);
+      setPatientDocs(data.PatientDocuments || []);
+    } catch (e) {
+      setPatientDocs(patient.PatientDocuments || []);
+    }
+    setShowPatientDocsModal(true);
+  };
+
   // QR Photo Upload state (patient)
   const [showPatientQrModal, setShowPatientQrModal] = useState(false);
   const [patientQrUrl, setPatientQrUrl] = useState('');
   const [patientQrLoading, setPatientQrLoading] = useState(false);
 
   const handleOpenPatientQr = async () => {
-    if (!editingId) return;
+    const targetPatientId = selectedPatientForDocs?.id || editingId;
+    if (!targetPatientId) return;
     setPatientQrLoading(true);
     setPatientQrUrl('');
     setShowPatientQrModal(true);
     try {
-      const res = await api.post(`/patients/${editingId}/photo-token`);
+      const res = await api.post(`/patients/${targetPatientId}/photo-token`);
       setPatientQrUrl(res.data.url);
     } catch (e) {
       setShowPatientQrModal(false);
@@ -410,8 +428,9 @@ const Patients = () => {
   };
 
   const handleFileUpload = async (e) => {
-    e.preventDefault();
-    if (!docUploadFile || !editingId) return;
+    if (e && e.preventDefault) e.preventDefault();
+    const targetPatientId = selectedPatientForDocs?.id || editingId;
+    if (!docUploadFile || !targetPatientId) return;
 
     const files = Array.from(docUploadFile);
     if (files.length === 0) return;
@@ -421,7 +440,7 @@ const Patients = () => {
       data.append('file', file);
       data.append('isConformity', isConformityChecked);
       try {
-        const response = await api.post(`/patients/${editingId}/documents`, data, {
+        const response = await api.post(`/patients/${targetPatientId}/documents`, data, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
         return response.data;
@@ -433,7 +452,11 @@ const Patients = () => {
 
     try {
       const results = await Promise.all(files.map(file => uploadFile(file)));
-      setPatientDocs([...patientDocs, ...results]);
+      setPatientDocs(prevDocs => [...prevDocs, ...results]);
+      setSelectedPatientForDocs(prev => prev ? {
+        ...prev,
+        PatientDocuments: [...(prev.PatientDocuments || []), ...results]
+      } : prev);
       fetchPatients();
     } catch (err) {
       showMsg('Hubo un error al subir uno o más documentos', 'alert');
@@ -446,10 +469,16 @@ const Patients = () => {
   };
 
   const handleDeleteDoc = (docId) => {
+    const targetPatientId = selectedPatientForDocs?.id || editingId;
+    if (!targetPatientId) return;
     showMsg('¿Está seguro de que desea eliminar este documento?', 'alert', async () => {
       try {
-        await api.delete(`/patients/${editingId}/documents/${docId}`);
-        setPatientDocs(patientDocs.filter(d => d.id !== docId));
+        await api.delete(`/patients/${targetPatientId}/documents/${docId}`);
+        setPatientDocs(prevDocs => prevDocs.filter(d => d.id !== docId));
+        setSelectedPatientForDocs(prev => prev ? {
+          ...prev,
+          PatientDocuments: (prev.PatientDocuments || []).filter(d => d.id !== docId)
+        } : prev);
         fetchPatients();
       } catch (err) {
         showMsg('Error al eliminar el documento', 'alert');
@@ -481,7 +510,7 @@ const Patients = () => {
 
   const handleSavePatientCrop = async (croppedBlob) => {
     try {
-      const patId = showingDoc?.patientId || editingId || viewingPatient?.id;
+      const patId = showingDoc?.patientId || selectedPatientForDocs?.id || editingId || viewingPatient?.id;
       if (!patId || !showingDoc) return;
 
       const formData = new FormData();
@@ -500,6 +529,13 @@ const Patients = () => {
       setImgPan({ x: 0, y: 0 });
 
       setPatientDocs(prev => prev.map(d => d.id === updatedDoc.id ? updatedDoc : d));
+
+      if (selectedPatientForDocs) {
+        setSelectedPatientForDocs(prev => prev ? ({
+          ...prev,
+          PatientDocuments: (prev.PatientDocuments || []).map(d => d.id === updatedDoc.id ? updatedDoc : d)
+        }) : prev);
+      }
 
       if (viewingPatient && viewingPatient.PatientDocuments) {
         setViewingPatient(prev => ({
@@ -685,13 +721,6 @@ const Patients = () => {
               </button>
               <button 
                 type="button"
-                onClick={() => setActiveTab('documents')}
-                style={{ background: 'none', border: 'none', padding: '10px 5px', cursor: 'pointer', borderBottom: activeTab === 'documents' ? '2px solid var(--primary)' : '2px solid transparent', fontWeight: activeTab === 'documents' ? 'bold' : 'normal', color: activeTab === 'documents' ? 'var(--primary)' : '#666' }}
-              >
-                Documentos
-              </button>
-              <button 
-                type="button"
                 onClick={() => setActiveTab('tests')}
                 style={{ background: 'none', border: 'none', padding: '10px 5px', cursor: 'pointer', borderBottom: activeTab === 'tests' ? '2px solid var(--primary)' : '2px solid transparent', fontWeight: activeTab === 'tests' ? 'bold' : 'normal', color: activeTab === 'tests' ? 'var(--primary)' : '#666' }}
               >
@@ -802,92 +831,6 @@ const Patients = () => {
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <div style={{ display: activeTab === 'documents' ? 'block' : 'none' }}>
-                {!editingId ? (
-                  <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: '#f9f9f9', borderRadius: '8px', color: '#666' }}>
-                    Para poder cargar documentos, primero debes guardar el perfil de este nuevo paciente.
-                  </div>
-                ) : (
-                  <div>
-                    <div style={{ marginTop: '1rem', background: '#f8f9fa', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                        <h4 style={{ margin: 0 }}>Subir Nuevo Documento</h4>
-                        <button
-                          type="button"
-                          onClick={handleOpenPatientQr}
-                          title="Subir foto desde celular (QR)"
-                          style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#475569' }}
-                        >
-                          <QrCode size={15} /> QR
-                        </button>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'end' }}>
-                          <div>
-                            <label style={{ fontSize: '0.9rem', display: 'block', marginBottom: '4px' }}>Archivo</label>
-                            <input 
-                              type="file" 
-                              multiple
-                              onChange={(e) => setDocUploadFile(e.target.files)} 
-                              accept=".pdf,image/*,.doc,.docx,.xls,.xlsx"
-                              className="form-control"
-                              style={{ width: '100%', padding: '5px', borderRadius: '8px', border: '1px solid #ddd', background: 'white' }}
-                              id="patient-file-upload"
-                            />
-                          </div>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', background: '#f0f9ff', padding: '6px 12px', borderRadius: '8px', border: '1px solid #bae6fd', color: '#0369a1' }}>
-                            <input 
-                              type="checkbox" 
-                              checked={isConformityChecked}
-                              onChange={(e) => setIsConformityChecked(e.target.checked)}
-                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                            />
-                            <span>¿Es Certificado de Conformidad?</span>
-                          </label>
-                        </div>
-                        <button 
-                          type="button" 
-                          onClick={handleFileUpload} 
-                          className="btn btn-primary" 
-                          disabled={!docUploadFile || docUploadFile.length === 0}
-                          style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
-                        >
-                          <Upload size={16} /> Subir Documento
-                        </button>
-                      </div>
-                    </div>
-
-                    <div style={{ border: '1px solid #eee', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto' }}>
-                      {patientDocs.length > 0 ? patientDocs.map(doc => (
-                        <div key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', borderBottom: '1px solid #eee', backgroundColor: doc.isConformity ? '#f0f9ff' : 'white' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <button 
-                              type="button" 
-                              onClick={() => setShowingDoc(doc)}
-                              style={{ background: 'none', border: 'none', padding: 0, textDecoration: 'none', color: 'var(--primary)', fontWeight: 'bold', fontSize: '0.9rem', textAlign: 'left', cursor: 'pointer' }}
-                            >
-                              {doc.originalName}
-                            </button>
-                            {doc.isConformity && (
-                              <span style={{ fontSize: '0.7rem', background: '#0369a1', color: 'white', padding: '2px 8px', borderRadius: '10px', textTransform: 'uppercase', fontWeight: 'bold' }}>
-                                C. Conformidad
-                              </span>
-                            )}
-                          </div>
-                          <button type="button" onClick={() => handleDeleteDoc(doc.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      )) : (
-                        <div style={{ padding: '1rem', textAlign: 'center', color: '#999', fontSize: '0.9rem' }}>
-                          No hay documentos cargados.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div style={{ display: activeTab === 'tests' ? 'block' : 'none' }}>
@@ -1109,6 +1052,9 @@ const Patients = () => {
                     <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => handleEdit(p)} title="Editar Paciente">
                       <Edit3 size={18} color="#4a90e2" />
                     </button>
+                    <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => openPatientDocsModal(p)} title="Documentos">
+                      <FilePlus size={18} color="#95a5a6" />
+                    </button>
                     <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => openActivities(p)} title="Historia Clínica">
                       <Activity size={18} color="var(--light-blue)" />
                     </button>
@@ -1127,6 +1073,9 @@ const Patients = () => {
                           position: 'absolute', right: 0, top: '100%', backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '8px',
                           boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10, minWidth: '160px', padding: '8px 0'
                         }}>
+                          <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', transition: 'background 0.2s' }} onClick={() => { setActiveDropdown(null); openPatientDocsModal(p); }}>
+                            <FilePlus size={16} color="#95a5a6" /> <span style={{ fontSize: '0.9rem' }}>Documentos</span>
+                          </button>
                           <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', transition: 'background 0.2s' }} onClick={() => openSessions(p)}>
                             <Calendar size={16} color="var(--primary)" /> <span style={{ fontSize: '0.9rem' }}>Sesiones</span>
                           </button>
@@ -1196,6 +1145,9 @@ const Patients = () => {
                 <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555', fontSize: '0.85rem' }} onClick={() => handleEdit(p)}>
                   <Edit3 size={16} color="#4a90e2" /> Editar
                 </button>
+                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555', fontSize: '0.85rem' }} onClick={() => openPatientDocsModal(p)} title="Documentos">
+                  <FilePlus size={16} color="#95a5a6" /> Docs
+                </button>
                 <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px', border: '1px solid #eee', background: '#fcfcfc', color: '#555', fontSize: '0.85rem' }} onClick={() => openActivities(p)}>
                   <Activity size={16} color="var(--light-blue)" /> H. Clín.
                 </button>
@@ -1214,6 +1166,9 @@ const Patients = () => {
                       position: 'absolute', right: 0, bottom: '100%', backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '8px',
                       boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', zIndex: 10, minWidth: '160px', padding: '8px 0', marginBottom: '8px'
                     }}>
+                      <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => { setActiveDropdown(null); openPatientDocsModal(p); }}>
+                        <FilePlus size={16} color="#95a5a6" /> <span style={{ fontSize: '0.9rem' }}>Documentos</span>
+                      </button>
                       <button style={{ width: '100%', textAlign: 'left', padding: '10px 15px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => openSessions(p)}>
                         <Calendar size={16} color="var(--primary)" /> <span style={{ fontSize: '0.9rem' }}>Sesiones</span>
                       </button>
@@ -1479,10 +1434,126 @@ const Patients = () => {
         </div>
       )}
 
+      {/* Patient Documents Modal */}
+      {showPatientDocsModal && selectedPatientForDocs && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '600px', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+            <button 
+              onClick={() => { setShowPatientDocsModal(false); setSelectedPatientForDocs(null); fetchPatients(); }} 
+              style={{ position: 'absolute', right: '15px', top: '15px', background: 'transparent', border: 'none', cursor: 'pointer' }}
+            >
+              <X />
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '36px' }}>
+              <h2>Documentos de {selectedPatientForDocs.firstName} {selectedPatientForDocs.lastName}</h2>
+              <button
+                type="button"
+                onClick={handleOpenPatientQr}
+                title="Subir foto desde celular con QR"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '7px 14px', borderRadius: '8px',
+                  background: 'var(--primary, #4f46e5)', color: 'white',
+                  border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600,
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <QrCode size={16} /> QR
+              </button>
+            </div>
+            
+            <div style={{ marginTop: '1rem', background: '#f8f9fa', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+              <h4 style={{ margin: '0 0 10px 0' }}>Subir Nuevo Documento</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'end' }}>
+                  <div>
+                    <label style={{ fontSize: '0.9rem', display: 'block', marginBottom: '4px' }}>Archivo</label>
+                    <input 
+                      type="file" 
+                      multiple
+                      onChange={(e) => setDocUploadFile(e.target.files)} 
+                      accept=".pdf,image/*,.doc,.docx,.xls,.xlsx"
+                      className="form-control"
+                      style={{ width: '100%', padding: '5px', borderRadius: '8px', border: '1px solid #ddd', background: 'white' }}
+                      id="patient-file-upload"
+                    />
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', background: '#f0f9ff', padding: '6px 12px', borderRadius: '8px', border: '1px solid #bae6fd', color: '#0369a1' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={isConformityChecked}
+                      onChange={(e) => setIsConformityChecked(e.target.checked)}
+                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                    />
+                    <span>¿Es Certificado de Conformidad?</span>
+                  </label>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={handleFileUpload} 
+                  className="btn btn-primary" 
+                  disabled={!docUploadFile || docUploadFile.length === 0}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
+                >
+                  <Upload size={16} /> Subir Documento
+                </button>
+              </div>
+            </div>
+
+            <h4>Documentos Subidos</h4>
+            <div style={{ border: '1px solid #eee', borderRadius: '8px', maxHeight: '280px', overflowY: 'auto' }}>
+              {patientDocs.length > 0 ? patientDocs.map(doc => (
+                <div key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', borderBottom: '1px solid #eee', backgroundColor: doc.isConformity ? '#f0f9ff' : 'white' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <button 
+                      type="button" 
+                      onClick={() => setShowingDoc(doc)}
+                      style={{ background: 'none', border: 'none', padding: 0, textDecoration: 'none', color: 'var(--primary)', fontWeight: 'bold', fontSize: '0.9rem', textAlign: 'left', cursor: 'pointer' }}
+                    >
+                      {doc.originalName}
+                    </button>
+                    {doc.isConformity && (
+                      <span style={{ fontSize: '0.7rem', background: '#0369a1', color: 'white', padding: '2px 8px', borderRadius: '10px', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                        C. Conformidad
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button type="button" onClick={() => handleDeleteDoc(doc.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }} title="Eliminar Documento">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              )) : (
+                <div style={{ padding: '1rem', textAlign: 'center', color: '#999', fontSize: '0.9rem' }}>
+                  No hay documentos cargados.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Patient QR Photo Upload Modal */}
       {showPatientQrModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div style={{ background: 'white', borderRadius: '16px', padding: '2rem', maxWidth: '380px', width: '90%', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+          <div style={{ background: 'white', borderRadius: '16px', padding: '2rem', maxWidth: '380px', width: '90%', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', position: 'relative' }}>
+            <button 
+              onClick={() => { 
+                const targetPatientId = selectedPatientForDocs?.id || editingId;
+                setShowPatientQrModal(false); 
+                if (targetPatientId) {
+                  api.get(`/patients/${targetPatientId}`).then(r => setPatientDocs(r.data.PatientDocuments || []));
+                }
+                fetchPatients(); 
+              }} 
+              style={{ position: 'absolute', right: '15px', top: '15px', background: 'transparent', border: 'none', cursor: 'pointer' }}
+            >
+              <X size={20} />
+            </button>
             <h3 style={{ margin: '0 0 8px', color: '#1e293b' }}>Subir foto con celular</h3>
             <p style={{ color: '#64748b', fontSize: '0.9rem', margin: '0 0 20px' }}>
               Escaneá este código QR con la cámara del celular para subir una foto al paciente.<br />
@@ -1501,7 +1572,14 @@ const Patients = () => {
               </>
             ) : null}
             <button
-              onClick={() => { setShowPatientQrModal(false); /* reload docs */ api.get(`/patients/${editingId}`).then(r => setPatientDocs(r.data.PatientDocuments || [])); fetchPatients(); }}
+              onClick={() => { 
+                const targetPatientId = selectedPatientForDocs?.id || editingId;
+                setShowPatientQrModal(false); 
+                if (targetPatientId) {
+                  api.get(`/patients/${targetPatientId}`).then(r => setPatientDocs(r.data.PatientDocuments || []));
+                }
+                fetchPatients(); 
+              }}
               style={{ marginTop: '16px', width: '100%', padding: '12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }}
             >
               Listo
