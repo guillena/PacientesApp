@@ -54,7 +54,12 @@ const Agenda = () => {
         api.get('/patients'),
         api.get('/benefits')
       ]);
-      setPatients(pts.data);
+      const sortedPatients = (pts.data || []).sort((a, b) => {
+        const nameA = `${a.lastName || ''}, ${a.firstName || ''}`.trim();
+        const nameB = `${b.lastName || ''}, ${b.firstName || ''}`.trim();
+        return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+      });
+      setPatients(sortedPatients);
       setBenefits(bnts.data);
 
       if (user.role === 'admin') {
@@ -174,7 +179,13 @@ const Agenda = () => {
     const startDate = arg.date;
     const endDate = new Date(startDate.getTime() + 30 * 60000);
 
-    const activePatients = patients.filter(p => !p.isInactive);
+    const activePatients = patients
+      .filter(p => !p.isInactive)
+      .sort((a, b) => {
+        const nameA = `${a.lastName || ''}, ${a.firstName || ''}`.trim();
+        const nameB = `${b.lastName || ''}, ${b.firstName || ''}`.trim();
+        return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+      });
 
     setEditingId(null);
     setDeleteFuture(false);
@@ -547,6 +558,11 @@ const Agenda = () => {
                     <option value="" disabled>Seleccione un paciente</option>
                     {patients
                       .filter(p => !p.isInactive || p.id === formData.patientId)
+                      .sort((a, b) => {
+                        const nameA = `${a.lastName || ''}, ${a.firstName || ''}`.trim();
+                        const nameB = `${b.lastName || ''}, ${b.firstName || ''}`.trim();
+                        return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+                      })
                       .map(p => <option key={p.id} value={p.id}>{p.lastName}, {p.firstName}</option>)
                     }
                   </select>

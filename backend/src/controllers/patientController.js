@@ -35,6 +35,10 @@ const createPatient = async (req, res) => {
 const getPatients = async (req, res) => {
   try {
     const patients = await Patient.findAll({
+      order: [
+        ['lastName', 'ASC'],
+        ['firstName', 'ASC']
+      ],
       include: [
         { model: DocumentType },
         { model: PatientDocument }
