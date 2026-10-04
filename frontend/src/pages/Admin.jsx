@@ -357,11 +357,22 @@ const Admin = () => {
     formData.append('profDocTypeId', docUploadForm.profDocTypeId);
 
     try {
-      await api.post(`/professionals/${selectedProfForDocs.id}/documents`, formData, {
+      const { data: newDoc } = await api.post(`/professionals/${selectedProfForDocs.id}/documents`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setDocUploadForm({ profDocTypeId: '', file: null });
       fetchProfDocs(selectedProfForDocs.id);
+      setProfessionals(prevProfs => prevProfs.map(prof => {
+        if (prof.id === selectedProfForDocs.id) {
+          const currentDocs = prof.ProfessionalDocuments || [];
+          return {
+            ...prof,
+            ProfessionalDocuments: [...currentDocs, newDoc]
+          };
+        }
+        return prof;
+      }));
+      fetchProfessionals();
     } catch (err) {
       showMsg('Error al subir el documento', 'alert');
     }
@@ -371,7 +382,18 @@ const Admin = () => {
     showMsg('¿Seguro de eliminar este documento?', 'alert', async () => {
       try {
         await api.delete(`/professionals/${selectedProfForDocs.id}/documents/${docId}`);
-        setProfDocs(profDocs.filter(d => d.id !== docId));
+        setProfDocs(prev => prev.filter(d => d.id !== docId));
+        setProfessionals(prevProfs => prevProfs.map(prof => {
+          if (prof.id === selectedProfForDocs.id) {
+            const currentDocs = prof.ProfessionalDocuments || [];
+            return {
+              ...prof,
+              ProfessionalDocuments: currentDocs.filter(d => d.id !== docId)
+            };
+          }
+          return prof;
+        }));
+        fetchProfessionals();
       } catch (err) {
         showMsg('Error al eliminar', 'alert');
       }
@@ -1779,7 +1801,7 @@ const Admin = () => {
           backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
         }}>
           <div className="card" style={{ width: '100%', maxWidth: '600px', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
-            <button onClick={() => setShowProfDocsModal(false)} style={{ position: 'absolute', right: '15px', top: '15px', background: 'transparent', border: 'none', cursor: 'pointer' }}><X /></button>
+            <button onClick={() => { setShowProfDocsModal(false); fetchProfessionals(); }} style={{ position: 'absolute', right: '15px', top: '15px', background: 'transparent', border: 'none', cursor: 'pointer' }}><X /></button>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '36px' }}>
               <h2>Documentos de {selectedProfForDocs.firstName} {selectedProfForDocs.lastName}</h2>
               <button
@@ -1869,7 +1891,7 @@ const Admin = () => {
           backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1200
         }}>
           <div className="card" style={{ width: '100%', maxWidth: '380px', textAlign: 'center', padding: '2rem', position: 'relative' }}>
-            <button onClick={() => setShowQrModal(false)} style={{ position: 'absolute', right: '15px', top: '15px', background: 'transparent', border: 'none', cursor: 'pointer' }}><X /></button>
+            <button onClick={() => { setShowQrModal(false); fetchProfDocs(selectedProfForDocs?.id); fetchProfessionals(); }} style={{ position: 'absolute', right: '15px', top: '15px', background: 'transparent', border: 'none', cursor: 'pointer' }}><X /></button>
             <h3 style={{ marginBottom: '0.4rem' }}>Subir foto con celular</h3>
             <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '1.2rem' }}>
               Escaneá este código QR con la cámara del celular para subir una foto al profesional.<br/>
@@ -1890,7 +1912,7 @@ const Admin = () => {
             <button
               className="btn btn-primary"
               style={{ marginTop: '1rem', width: '100%' }}
-              onClick={() => { setShowQrModal(false); fetchProfDocs(selectedProfForDocs?.id); }}
+              onClick={() => { setShowQrModal(false); fetchProfDocs(selectedProfForDocs?.id); fetchProfessionals(); }}
             >
               Listo
             </button>

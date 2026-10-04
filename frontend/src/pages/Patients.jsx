@@ -1447,7 +1447,7 @@ const Patients = () => {
               </>
             ) : null}
             <button
-              onClick={() => { setShowPatientQrModal(false); /* reload docs */ api.get(`/patients/${editingId}`).then(r => setPatientDocs(r.data.PatientDocuments || [])); }}
+              onClick={() => { setShowPatientQrModal(false); /* reload docs */ api.get(`/patients/${editingId}`).then(r => setPatientDocs(r.data.PatientDocuments || [])); fetchPatients(); }}
               style={{ marginTop: '16px', width: '100%', padding: '12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }}
             >
               Listo
