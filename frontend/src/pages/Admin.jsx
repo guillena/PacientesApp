@@ -72,7 +72,19 @@ const Admin = () => {
   const [showingDoc, setShowingDoc] = useState(null);
   const [imgZoom, setImgZoom] = useState(1);
   const [imgRotation, setImgRotation] = useState(0);
+  const [imgPan, setImgPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isDocMaximized, setIsDocMaximized] = useState(false);
+
+  useEffect(() => {
+    if (showingDoc) {
+      setImgZoom(1);
+      setImgRotation(0);
+      setImgPan({ x: 0, y: 0 });
+    }
+  }, [showingDoc]);
+
   const [testForm, setTestForm] = useState({ name: '', category: '', customCategory: '', description: '', active: true, isNewCat: false });
   
   // State for Global Messages
@@ -1946,20 +1958,31 @@ const Admin = () => {
               </h3>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 {showingDoc.fileUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/) && (
-                  <div style={{ display: 'flex', gap: '5px', marginRight: '10px', paddingRight: '10px', borderRight: '1px solid #ddd' }}>
+                  <div style={{ display: 'flex', gap: '5px', marginRight: '10px', paddingRight: '10px', borderRight: '1px solid #ddd', alignItems: 'center' }}>
                     <button 
-                      onClick={() => setImgZoom(prev => Math.min(prev + 0.1, 3))}
-                      style={{ background: '#f0f0f0', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#555' }}
-                      title="Acercar"
-                    >
-                      <ZoomIn size={18} />
-                    </button>
-                    <button 
-                      onClick={() => setImgZoom(prev => Math.max(prev - 0.1, 0.5))}
+                      onClick={() => setImgZoom(prev => {
+                        const next = Math.max(Math.round((prev - 0.1) * 10) / 10, 0.5);
+                        if (next <= 1) setImgPan({ x: 0, y: 0 });
+                        return next;
+                      })}
                       style={{ background: '#f0f0f0', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#555' }}
                       title="Alejar"
                     >
                       <ZoomOut size={18} />
+                    </button>
+                    <span 
+                      onClick={() => { setImgZoom(1); setImgPan({ x: 0, y: 0 }); }}
+                      style={{ fontSize: '0.8rem', color: '#666', minWidth: '42px', textAlign: 'center', userSelect: 'none', cursor: 'pointer', fontWeight: '500' }}
+                      title="Click para restablecer al 100%"
+                    >
+                      {Math.round(imgZoom * 100)}%
+                    </span>
+                    <button 
+                      onClick={() => setImgZoom(prev => Math.min(Math.round((prev + 0.1) * 10) / 10, 3))}
+                      style={{ background: '#f0f0f0', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#555' }}
+                      title="Acercar"
+                    >
+                      <ZoomIn size={18} />
                     </button>
                     <button 
                       onClick={() => setImgRotation(prev => (prev + 90) % 360)}
@@ -1987,7 +2010,7 @@ const Admin = () => {
                 </button>
 
                 <button 
-                  onClick={() => { setShowingDoc(null); setIsDocMaximized(false); setImgZoom(1); setImgRotation(0); }}
+                  onClick={() => { setShowingDoc(null); setIsDocMaximized(false); setImgZoom(1); setImgRotation(0); setImgPan({ x: 0, y: 0 }); }}
                   style={{ background: '#fee2e2', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#ef4444' }}
                 >
                   <X size={18} />
@@ -1995,7 +2018,45 @@ const Admin = () => {
               </div>
             </div>
 
-            <div style={{ flex: 1, backgroundColor: '#525659', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'auto', position: 'relative' }}>
+            <div 
+              onMouseDown={(e) => {
+                if (imgZoom > 1) {
+                  e.preventDefault();
+                  setIsDragging(true);
+                  setDragStart({ x: e.clientX - imgPan.x, y: e.clientY - imgPan.y });
+                }
+              }}
+              onMouseMove={(e) => {
+                if (isDragging && imgZoom > 1) {
+                  e.preventDefault();
+                  setImgPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+                }
+              }}
+              onMouseUp={() => setIsDragging(false)}
+              onMouseLeave={() => setIsDragging(false)}
+              onTouchStart={(e) => {
+                if (imgZoom > 1 && e.touches.length === 1) {
+                  setIsDragging(true);
+                  setDragStart({ x: e.touches[0].clientX - imgPan.x, y: e.touches[0].clientY - imgPan.y });
+                }
+              }}
+              onTouchMove={(e) => {
+                if (isDragging && imgZoom > 1 && e.touches.length === 1) {
+                  setImgPan({ x: e.touches[0].clientX - dragStart.x, y: e.touches[0].clientY - dragStart.y });
+                }
+              }}
+              onTouchEnd={() => setIsDragging(false)}
+              style={{ 
+                flex: 1, 
+                backgroundColor: '#525659', 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                overflow: 'hidden', 
+                position: 'relative',
+                cursor: imgZoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'
+              }}
+            >
               {(() => {
                 const previewUrl = `${api.defaults.baseURL}/professionals/documents/${showingDoc.id}/view?token=${localStorage.getItem('token')}`;
                 
@@ -2003,12 +2064,15 @@ const Admin = () => {
                   return <img 
                     src={previewUrl} 
                     alt={showingDoc.originalName} 
+                    draggable={false}
                     style={{ 
-                      maxWidth: imgZoom === 1 ? '100%' : 'none', 
-                      maxHeight: imgZoom === 1 ? '100%' : 'none', 
+                      maxWidth: '100%', 
+                      maxHeight: '100%', 
                       objectFit: 'contain',
-                      transform: `scale(${imgZoom}) rotate(${imgRotation}deg)`,
-                      transition: 'transform 0.2s ease-in-out'
+                      transform: `translate(${imgPan.x}px, ${imgPan.y}px) scale(${imgZoom}) rotate(${imgRotation}deg)`,
+                      transition: isDragging ? 'none' : 'transform 0.15s ease-out',
+                      userSelect: 'none',
+                      pointerEvents: 'none'
                     }} 
                   />;
                 } 
