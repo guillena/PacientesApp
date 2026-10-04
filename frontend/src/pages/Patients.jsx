@@ -451,26 +451,24 @@ const Patients = () => {
   };
 
   const handleDownload = async (doc) => {
-    const fullUrl = doc.url.startsWith('http') ? doc.url : `http://localhost:5000${doc.url}`;
     try {
-      const response = await fetch(fullUrl);
-      const blob = await response.blob();
+      const response = await api.get(`/patients/document/${doc.id}/view?download=true`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { 
+        type: response.headers['content-type'] || 'application/octet-stream' 
+      });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', doc.originalName);
+      link.setAttribute('download', doc.originalName || 'documento');
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url);
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
     } catch (err) {
       console.error('Error downloading file:', err);
-      // Fallback to direct link if fetch fails (e.g. CORS)
-      const link = document.createElement('a');
-      link.href = fullUrl;
-      link.setAttribute('download', doc.originalName);
-      link.setAttribute('target', '_blank');
-      link.click();
+      showMsg('Error al descargar el documento.', 'alert');
     }
   };
 

@@ -412,17 +412,24 @@ const Admin = () => {
     });
   };
 
-  const handleDownload = (doc) => {
+  const handleDownload = async (doc) => {
     try {
-      const downloadUrl = `${api.defaults.baseURL}/professionals/documents/${doc.id}/view?token=${localStorage.getItem('token')}`;
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = doc.originalName || 'documento';
-      a.target = '_blank';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const response = await api.get(`/professionals/documents/${doc.id}/view?download=true`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { 
+        type: response.headers['content-type'] || 'application/octet-stream' 
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', doc.originalName || 'documento');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
     } catch (err) {
+      console.error('Error downloading file:', err);
       showMsg('Error al intentar descargar el documento.', 'alert');
     }
   };

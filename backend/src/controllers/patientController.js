@@ -313,7 +313,8 @@ const getPatientDocument = async (req, res) => {
     // Determine type for correct response headers
     const contentType = doc.url.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg';
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(doc.originalName)}"`);
+    const disposition = req.query.download === 'true' ? 'attachment' : 'inline';
+    res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(doc.originalName)}"`);
 
     const bucketName = process.env.BUCKET_NAME || process.env.BUCKET;
     if (bucketName) {
