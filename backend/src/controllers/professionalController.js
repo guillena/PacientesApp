@@ -1,12 +1,16 @@
 const bcrypt = require('bcryptjs');
-const { Professional, Benefit, ProfessionalDocument } = require('../models');
+const { Professional, Benefit, ProfessionalDocument, DocumentType, ProfDocType } = require('../models');
 const archiver = require('archiver');
 const fs = require('fs');
 const path = require('path');
 
 const createProfessional = async (req, res) => {
   try {
-    let { firstName, lastName, username, password, role, benefitIds, color } = req.body;
+    let { 
+      firstName, lastName, username, password, role, benefitIds, color, 
+      street, number, floor, apartment, province, city, postalCode,
+      docTypeId, docNumber, licenseNumber, startDate 
+    } = req.body;
     if (role === 'admin') color = '#95a5a6';
 
     console.log('--- CREATE PROFESSIONAL ---');
@@ -14,7 +18,12 @@ const createProfessional = async (req, res) => {
     
     const hashedPassword = await bcrypt.hash(password, 8);
     const professional = await Professional.create({
-      firstName, lastName, username, password: hashedPassword, role, color
+      firstName, lastName, username, password: hashedPassword, role, color,
+      street, number, floor, apartment, province, city, postalCode,
+      docTypeId: docTypeId || null,
+      docNumber: docNumber || null,
+      licenseNumber: licenseNumber || null,
+      startDate: startDate || null
     });
     console.log('Created ID:', professional.id);
 
@@ -23,9 +32,13 @@ const createProfessional = async (req, res) => {
       await professional.setBenefits(benefitIds);
     }
 
-    // Refresh professional to include Benefits in the re-fetched object
+    // Refresh professional to include Benefits and DocumentType in the re-fetched object
     const profWithBenefits = await Professional.findByPk(professional.id, {
-      include: [Benefit],
+      include: [
+        Benefit, 
+        { model: ProfessionalDocument, include: [ProfDocType] }, 
+        DocumentType
+      ],
       attributes: { exclude: ['password'] }
     });
 
@@ -44,7 +57,11 @@ const getProfessionals = async (req, res) => {
   try {
     const professionals = await Professional.findAll({
       attributes: { exclude: ['password'] },
-      include: [Benefit, ProfessionalDocument]
+      include: [
+        Benefit, 
+        { model: ProfessionalDocument, include: [ProfDocType] }, 
+        DocumentType
+      ]
     });
     res.send(professionals);
   } catch (e) {
@@ -71,6 +88,9 @@ const updateProfessional = async (req, res) => {
     if (updateData.role === 'admin') {
       updateData.color = '#95a5a6';
     }
+
+    if (updateData.docTypeId === '') updateData.docTypeId = null;
+    if (updateData.startDate === '') updateData.startDate = null;
     
     console.log('--- UPDATE PROFESSIONAL ---');
     console.log('Body:', JSON.stringify({ ...updateData, password: '***' }));
@@ -83,7 +103,11 @@ const updateProfessional = async (req, res) => {
     }
     
     const profWithBenefits = await Professional.findByPk(professional.id, {
-      include: [Benefit],
+      include: [
+        Benefit, 
+        { model: ProfessionalDocument, include: [ProfDocType] }, 
+        DocumentType
+      ],
       attributes: { exclude: ['password'] }
     });
     console.log('UPDATE PROF SUCCESS:', professional.username);

@@ -96,6 +96,31 @@ sequelize.sync().then(async () => {
       });
       console.log('[Migration] Added column "paid" to Appointments table successfully');
     }
+
+    // Automatic safe column migration for Professionals table (address & personal fields)
+    const profTableDescription = await queryInterface.describeTable('Professionals');
+    const profCols = [
+      { name: 'street', type: require('sequelize').DataTypes.STRING },
+      { name: 'number', type: require('sequelize').DataTypes.STRING },
+      { name: 'floor', type: require('sequelize').DataTypes.STRING },
+      { name: 'apartment', type: require('sequelize').DataTypes.STRING },
+      { name: 'province', type: require('sequelize').DataTypes.STRING },
+      { name: 'city', type: require('sequelize').DataTypes.STRING },
+      { name: 'postalCode', type: require('sequelize').DataTypes.STRING },
+      { name: 'docTypeId', type: require('sequelize').DataTypes.UUID },
+      { name: 'docNumber', type: require('sequelize').DataTypes.STRING },
+      { name: 'licenseNumber', type: require('sequelize').DataTypes.STRING },
+      { name: 'startDate', type: require('sequelize').DataTypes.DATEONLY }
+    ];
+    for (const col of profCols) {
+      if (!profTableDescription[col.name]) {
+        await queryInterface.addColumn('Professionals', col.name, {
+          type: col.type,
+          allowNull: true
+        });
+        console.log(`[Migration] Added column "${col.name}" to Professionals table successfully`);
+      }
+    }
   } catch (migErr) {
     console.log('[Migration check]', migErr.message);
   }

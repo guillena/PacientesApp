@@ -8,6 +8,12 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import MessageModal from '../components/MessageModal';
 
+const provinces = [
+  'Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Córdoba', 'Corrientes', 'Entre Ríos', 
+  'Formosa', 'Jujuy', 'La Pampa', 'La Rioja', 'Mendoza', 'Misiones', 'Neuquén', 'Río Negro', 
+  'Salta', 'San Juan', 'San Luis', 'Santa Cruz', 'Santa Fe', 'Santiago del Estero', 'Tierra del Fuego', 'Tucumán'
+];
+
 const Admin = () => {
   const [activeTab, setActiveTab] = useState('professionals'); // 'professionals', 'benefits', 'archive' or 'tests'
   
@@ -16,7 +22,30 @@ const Admin = () => {
   const [isLoadingProfs, setIsLoadingProfs] = useState(false);
   const [showProfModal, setShowProfModal] = useState(false);
   const [editingProfId, setEditingProfId] = useState(null);
-  const [profForm, setProfForm] = useState({ firstName: '', lastName: '', username: '', password: '', role: 'professional', color: '#b9d3fd', benefitIds: [] });
+  const [showViewProfModal, setShowViewProfModal] = useState(false);
+  const [viewingProf, setViewingProf] = useState(null);
+  const [profModalTab, setProfModalTab] = useState('personal'); // 'personal' | 'benefits' | 'direction'
+  const [docTypes, setDocTypes] = useState([]);
+  const [profForm, setProfForm] = useState({ 
+    firstName: '', 
+    lastName: '', 
+    username: '', 
+    password: '', 
+    role: 'professional', 
+    color: '#b9d3fd', 
+    benefitIds: [],
+    docTypeId: '',
+    docNumber: '',
+    licenseNumber: '',
+    startDate: '',
+    street: '',
+    number: '',
+    floor: '',
+    apartment: '',
+    province: '',
+    city: '',
+    postalCode: ''
+  });
   const [profSortConfig, setProfSortConfig] = useState({ key: 'firstName', direction: 'asc' });
 
   // State for Benefits (Prestaciones)
@@ -77,7 +106,17 @@ const Admin = () => {
     fetchTests();
     fetchTestCategories();
     fetchProfDocTypes();
+    fetchDocTypes();
   }, []);
+
+  const fetchDocTypes = async () => {
+    try {
+      const { data } = await api.get('/patients/document-types');
+      setDocTypes(data);
+    } catch (err) {
+      console.error('Error fetching document types', err);
+    }
+  };
 
   useEffect(() => {
     setTestPage(1);
@@ -95,6 +134,11 @@ const Admin = () => {
 
   const handleProfSubmit = async (e) => {
     e.preventDefault();
+    if (!profForm.firstName.trim() || !profForm.lastName.trim() || !profForm.username.trim() || (!editingProfId && !profForm.password)) {
+      setProfModalTab('personal');
+      showMsg('Por favor complete todos los campos obligatorios (*).', 'alert');
+      return;
+    }
     try {
       if (editingProfId) {
         await api.patch(`/professionals/${editingProfId}`, profForm);
@@ -110,6 +154,7 @@ const Admin = () => {
   };
 
   const openProfModal = (prof = null) => {
+    setProfModalTab('personal');
     if (prof) {
       setEditingProfId(prof.id);
       setProfForm({ 
@@ -119,14 +164,49 @@ const Admin = () => {
         role: prof.role,
         color: prof.color || '#b9d3fd',
         benefitIds: prof.Benefits ? prof.Benefits.map(b => b.id) : [],
-        password: '' 
+        password: '',
+        docTypeId: prof.docTypeId || '',
+        docNumber: prof.docNumber || '',
+        licenseNumber: prof.licenseNumber || '',
+        startDate: prof.startDate ? prof.startDate.split('T')[0] : '',
+        street: prof.street || '',
+        number: prof.number || '',
+        floor: prof.floor || '',
+        apartment: prof.apartment || '',
+        province: prof.province || '',
+        city: prof.city || '',
+        postalCode: prof.postalCode || ''
       });
     } else {
       setEditingProfId(null);
-      setProfForm({ firstName: '', lastName: '', username: '', password: '', role: 'professional', color: '#b9d3fd', benefitIds: [] });
+      setProfForm({ 
+        firstName: '', 
+        lastName: '', 
+        username: '', 
+        password: '', 
+        role: 'professional', 
+        color: '#b9d3fd', 
+        benefitIds: [],
+        docTypeId: '',
+        docNumber: '',
+        licenseNumber: '',
+        startDate: '',
+        street: '',
+        number: '',
+        floor: '',
+        apartment: '',
+        province: '',
+        city: '',
+        postalCode: ''
+      });
     }
     setShowPassword(false);
     setShowProfModal(true);
+  };
+
+  const openViewProfModal = (prof) => {
+    setViewingProf(prof);
+    setShowViewProfModal(true);
   };
 
   const handleProfSort = (key) => {
@@ -704,13 +784,16 @@ const Admin = () => {
                     </td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => openProfModal(p)}>
+                        <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => openViewProfModal(p)} title="Ver Detalles">
+                          <Eye size={18} color="#4a90e2" />
+                        </button>
+                        <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => openProfModal(p)} title="Editar Profesional">
                           <Edit3 size={18} color="var(--salmon)" />
                         </button>
                         <button className="btn" title="Documentos" style={{ padding: '6px', background: 'transparent' }} onClick={() => openProfDocsModal(p)}>
                           <FilePlus size={18} color="#95a5a6" />
                         </button>
-                        <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => handleProfDelete(p.id)}>
+                        <button className="btn" style={{ padding: '6px', background: 'transparent' }} onClick={() => handleProfDelete(p.id)} title="Eliminar Profesional">
                           <Trash2 size={18} color="#e74c3c" />
                         </button>
                       </div>
@@ -1170,90 +1253,366 @@ const Admin = () => {
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
         }}>
-          <div className="card" style={{ width: '100%', maxWidth: '500px', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '550px', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
             <button onClick={() => setShowProfModal(false)} style={{ position: 'absolute', right: '15px', top: '15px', background: 'transparent', border: 'none', cursor: 'pointer' }}><X /></button>
             <h2>{editingProfId ? 'Editar Profesional' : 'Nuevo Profesional'}</h2>
-            <form onSubmit={handleProfSubmit} style={{ marginTop: '1rem' }} autoComplete="off">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <label>Nombre</label>
-                  <input type="text" required className="form-control" style={{ width: '100%', padding: '8px', borderRadius:'8px', border:'1px solid #ddd'}} value={profForm.firstName} onChange={e => setProfForm({...profForm, firstName: e.target.value})} />
-                </div>
-                <div>
-                  <label>Apellido</label>
-                  <input type="text" required className="form-control" style={{ width: '100%', padding: '8px', borderRadius:'8px', border:'1px solid #ddd'}} value={profForm.lastName} onChange={e => setProfForm({...profForm, lastName: e.target.value})} />
-                </div>
-              </div>
-              <div style={{ marginBottom: '1rem' }}>
-                <label>Usuario</label>
-                <input type="text" autoComplete="none" required className="form-control" style={{ width: '100%', padding: '8px', borderRadius:'8px', border:'1px solid #ddd'}} value={profForm.username} onChange={e => setProfForm({...profForm, username: e.target.value})} />
-              </div>
-              <div style={{ marginBottom: '1rem' }}>
-                <label>Contraseña {editingProfId && '(Dejar en blanco para no cambiar)'}</label>
-                <div style={{ position: 'relative' }}>
-                  <input 
-                    type={showPassword ? "text" : "password"} 
-                    autoComplete="new-password"
-                    required={!editingProfId} 
-                    className="form-control" 
-                    style={{ width: '100%', padding: '8px', paddingRight: '40px', borderRadius:'8px', border:'1px solid #ddd'}} 
-                    value={profForm.password} 
-                    onChange={e => setProfForm({...profForm, password: e.target.value})} 
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    style={{
-                      position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
-                      background: 'none', border: 'none', cursor: 'pointer', color: '#666', display: 'flex', alignItems: 'center'
-                    }}
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-              </div>
-              <div style={{ marginBottom: '1rem' }}>
-                <label>Rol</label>
-                <select className="form-control" style={{ width: '100%', padding: '8px', borderRadius:'8px', border:'1px solid #ddd', background:'white'}} value={profForm.role} onChange={e => setProfForm({...profForm, role: e.target.value})}>
-                  <option value="professional">Profesional</option>
-                  <option value="admin">Administrador</option>
-                </select>
-              </div>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', marginBottom: '8px' }}>Color asociado</label>
-                {profForm.role === 'admin' ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '8px', backgroundColor: '#95a5a6' }} />
-                    <span style={{ fontSize: '0.8rem', color: '#666' }}>Gris por defecto para administradores</span>
+
+            {/* Tabs Header */}
+            <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #ddd', marginTop: '1rem', marginBottom: '1.2rem', paddingBottom: '4px' }}>
+              <button
+                type="button"
+                onClick={() => setProfModalTab('personal')}
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderBottom: profModalTab === 'personal' ? '2px solid var(--primary)' : '2px solid transparent',
+                  background: 'none',
+                  fontWeight: profModalTab === 'personal' ? 'bold' : 'normal',
+                  color: profModalTab === 'personal' ? 'var(--primary)' : '#666',
+                  cursor: 'pointer'
+                }}
+              >
+                Datos Personales
+              </button>
+              <button
+                type="button"
+                onClick={() => setProfModalTab('benefits')}
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderBottom: profModalTab === 'benefits' ? '2px solid var(--primary)' : '2px solid transparent',
+                  background: 'none',
+                  fontWeight: profModalTab === 'benefits' ? 'bold' : 'normal',
+                  color: profModalTab === 'benefits' ? 'var(--primary)' : '#666',
+                  cursor: 'pointer'
+                }}
+              >
+                Prestaciones
+              </button>
+              <button
+                type="button"
+                onClick={() => setProfModalTab('direction')}
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderBottom: profModalTab === 'direction' ? '2px solid var(--primary)' : '2px solid transparent',
+                  background: 'none',
+                  fontWeight: profModalTab === 'direction' ? 'bold' : 'normal',
+                  color: profModalTab === 'direction' ? 'var(--primary)' : '#666',
+                  cursor: 'pointer'
+                }}
+              >
+                Dirección
+              </button>
+            </div>
+
+            <form onSubmit={handleProfSubmit} noValidate autoComplete="off">
+              {/* Tab 1: Datos Personales */}
+              <div style={{ display: profModalTab === 'personal' ? 'block' : 'none' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px' }}>Nombre *</label>
+                    <input type="text" required className="form-control" style={{ width: '100%', padding: '8px', borderRadius:'8px', border:'1px solid #ddd'}} value={profForm.firstName} onChange={e => setProfForm({...profForm, firstName: e.target.value})} />
                   </div>
-                ) : (
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {['#E3F2FD', '#90CAF9', '#42A5F5', '#1976D2', '#E8F5E9', '#A5D6A7', '#66BB6A', '#43A047', '#FFF8E1', '#FFE082', '#FFCA28', '#FFB300', '#FFEBEE', '#FFCDD2', '#EF5350', '#E53935'].map(colorHex => (
-                      <div
-                        key={colorHex}
-                        onClick={() => setProfForm({...profForm, color: colorHex})}
-                        style={{
-                          width: '24px', height: '24px', backgroundColor: colorHex, borderRadius: '4px', cursor: 'pointer',
-                          border: profForm.color === colorHex ? '2px solid #333' : '1px solid #ddd'
-                        }}
-                      />
-                    ))}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px' }}>Apellido *</label>
+                    <input type="text" required className="form-control" style={{ width: '100%', padding: '8px', borderRadius:'8px', border:'1px solid #ddd'}} value={profForm.lastName} onChange={e => setProfForm({...profForm, lastName: e.target.value})} />
                   </div>
-                )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px' }}>Tipo de Doc. (Opcional)</label>
+                    <select
+                      className="form-control"
+                      style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #ddd', background: 'white' }}
+                      value={profForm.docTypeId}
+                      onChange={e => setProfForm({...profForm, docTypeId: e.target.value})}
+                    >
+                      <option value="">Seleccione...</option>
+                      {docTypes.map(dt => (
+                        <option key={dt.id} value={dt.id}>{dt.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px' }}>Nro. de Documento (Opcional)</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #ddd' }}
+                      value={profForm.docNumber}
+                      onChange={e => setProfForm({...profForm, docNumber: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px' }}>Nro. de Matrícula (Opcional)</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #ddd' }}
+                      value={profForm.licenseNumber}
+                      onChange={e => setProfForm({...profForm, licenseNumber: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px' }}>Fecha de Alta (Opcional)</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #ddd' }}
+                      value={profForm.startDate}
+                      onChange={e => setProfForm({...profForm, startDate: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px' }}>Usuario *</label>
+                  <input type="text" autoComplete="none" required className="form-control" style={{ width: '100%', padding: '8px', borderRadius:'8px', border:'1px solid #ddd'}} value={profForm.username} onChange={e => setProfForm({...profForm, username: e.target.value})} />
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px' }}>Contraseña {!editingProfId && '*'} {editingProfId && '(Dejar en blanco para no cambiar)'}</label>
+                  <div style={{ position: 'relative' }}>
+                    <input 
+                      type={showPassword ? "text" : "password"} 
+                      autoComplete="new-password"
+                      required={!editingProfId} 
+                      className="form-control" 
+                      style={{ width: '100%', padding: '8px', paddingRight: '40px', borderRadius:'8px', border:'1px solid #ddd'}} 
+                      value={profForm.password} 
+                      onChange={e => setProfForm({...profForm, password: e.target.value})} 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{
+                        position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                        background: 'none', border: 'none', cursor: 'pointer', color: '#666', display: 'flex', alignItems: 'center'
+                      }}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px' }}>Rol</label>
+                  <select className="form-control" style={{ width: '100%', padding: '8px', borderRadius:'8px', border:'1px solid #ddd', background:'white'}} value={profForm.role} onChange={e => setProfForm({...profForm, role: e.target.value})}>
+                    <option value="professional">Profesional</option>
+                    <option value="admin">Administrador</option>
+                  </select>
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '8px' }}>Color asociado</label>
+                  {profForm.role === 'admin' ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '8px', backgroundColor: '#95a5a6' }} />
+                      <span style={{ fontSize: '0.8rem', color: '#666' }}>Gris por defecto para administradores</span>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {['#E3F2FD', '#90CAF9', '#42A5F5', '#1976D2', '#E8F5E9', '#A5D6A7', '#66BB6A', '#43A047', '#FFF8E1', '#FFE082', '#FFCA28', '#FFB300', '#FFEBEE', '#FFCDD2', '#EF5350', '#E53935'].map(colorHex => (
+                        <div
+                          key={colorHex}
+                          onClick={() => setProfForm({...profForm, color: colorHex})}
+                          style={{
+                            width: '24px', height: '24px', backgroundColor: colorHex, borderRadius: '4px', cursor: 'pointer',
+                            border: profForm.color === colorHex ? '2px solid #333' : '1px solid #ddd'
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Prestaciones</label>
-                <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #ddd', borderRadius: '8px', padding: '10px' }}>
+
+              {/* Tab 2: Prestaciones */}
+              <div style={{ display: profModalTab === 'benefits' ? 'block' : 'none' }}>
+                <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.8rem' }}>
+                  Seleccione las prestaciones habilitadas para este profesional:
+                </p>
+                <div style={{ maxHeight: '280px', overflowY: 'auto', border: '1px solid #ddd', borderRadius: '8px', padding: '10px' }}>
                   {benefits.map(b => (
-                    <label key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={profForm.benefitIds.includes(b.id)} onChange={() => toggleBenefitSelection(b.id)} />
+                    <label key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={profForm.benefitIds.includes(b.id)} 
+                        onChange={() => toggleBenefitSelection(b.id)} 
+                        style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                      />
                       <span style={{ fontSize: '0.9rem' }}>{b.name}</span>
                     </label>
                   ))}
                 </div>
               </div>
-              <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Guardar</button>
+
+              {/* Tab 3: Dirección */}
+              <div style={{ display: profModalTab === 'direction' ? 'block' : 'none' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '70% 30%', gap: '1rem', marginBottom: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px', color: '#666' }}>Calle</label>
+                    <input type="text" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd' }} value={profForm.street} onChange={e => setProfForm({...profForm, street: e.target.value})} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px', color: '#666' }}>Nro</label>
+                    <input type="text" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd' }} value={profForm.number} onChange={e => setProfForm({...profForm, number: e.target.value})} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px', color: '#666' }}>Piso</label>
+                    <input type="text" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd' }} value={profForm.floor} onChange={e => setProfForm({...profForm, floor: e.target.value})} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px', color: '#666' }}>Dto</label>
+                    <input type="text" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd' }} value={profForm.apartment} onChange={e => setProfForm({...profForm, apartment: e.target.value})} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '1.5rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px', color: '#666' }}>Provincia</label>
+                    <select style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', backgroundColor: 'white' }} value={profForm.province} onChange={e => setProfForm({...profForm, province: e.target.value})}>
+                      <option value="">Seleccione...</option>
+                      {provinces.map(prov => <option key={prov} value={prov}>{prov}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px', color: '#666' }}>Ciudad</label>
+                    <input type="text" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd' }} value={profForm.city} onChange={e => setProfForm({...profForm, city: e.target.value})} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px', color: '#666' }}>C. Postal</label>
+                    <input type="text" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd' }} value={profForm.postalCode} onChange={e => setProfForm({...profForm, postalCode: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '0.5rem' }}>Guardar</button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Read-Only Professional View Modal */}
+      {showViewProfModal && viewingProf && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(4px)'
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+            <button 
+              onClick={() => { setShowViewProfModal(false); setViewingProf(null); }}
+              style={{ position: 'absolute', right: '20px', top: '20px', background: 'transparent', border: 'none', cursor: 'pointer' }}
+            >
+              <X size={24} />
+            </button>
+            <h2 style={{ marginBottom: '1.5rem', borderBottom: '2px solid #f0f0f0', paddingBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: viewingProf.role === 'admin' ? '#95a5a6' : (viewingProf.color || '#b9d3fd'), flexShrink: 0 }}></div>
+              Detalle del Profesional
+            </h2>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* Personal info section */}
+              <div>
+                <h3 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '10px' }}>Datos Personales</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px' }}>
+                   <p style={{ margin: 0 }}><strong>Nombre:</strong> {viewingProf.firstName}</p>
+                   <p style={{ margin: 0 }}><strong>Apellido:</strong> {viewingProf.lastName}</p>
+                   <p style={{ margin: 0 }}><strong>Usuario:</strong> {viewingProf.username}</p>
+                   <p style={{ margin: 0 }}>
+                     <strong>Rol:</strong>{' '}
+                     <span style={{ 
+                       background: viewingProf.role === 'admin' ? 'var(--light-blue)' : 'var(--soft-gray)', 
+                       padding: '2px 8px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 'bold' 
+                     }}>
+                       {viewingProf.role === 'admin' ? 'Administrador' : 'Profesional'}
+                     </span>
+                   </p>
+                   <p style={{ margin: 0 }}>
+                     <strong>Documento:</strong> {viewingProf.docNumber ? `${viewingProf.docNumber} (${viewingProf.DocumentType?.name || 'S/D'})` : 'Sin especificar'}
+                   </p>
+                   <p style={{ margin: 0 }}>
+                     <strong>Nro. Matrícula:</strong> {viewingProf.licenseNumber || 'Sin especificar'}
+                   </p>
+                   <p style={{ margin: 0 }}>
+                     <strong>Fecha de Alta:</strong> {viewingProf.startDate ? (viewingProf.startDate.includes('T') ? viewingProf.startDate.split('T')[0].split('-').reverse().join('/') : viewingProf.startDate.split('-').reverse().join('/')) : 'Sin especificar'}
+                   </p>
+                   <div style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                     <strong>Color:</strong>
+                     <span style={{ width: '18px', height: '18px', borderRadius: '4px', backgroundColor: viewingProf.role === 'admin' ? '#95a5a6' : (viewingProf.color || '#b9d3fd'), display: 'inline-block', border: '1px solid #ccc' }}></span>
+                     <span style={{ fontSize: '0.85rem', color: '#666' }}>{viewingProf.color || '#b9d3fd'}</span>
+                   </div>
+                </div>
+              </div>
+
+              {/* Prestaciones section */}
+              <div>
+                <h3 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '10px' }}>Prestaciones Habilitadas</h3>
+                <div style={{ backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px' }}>
+                  {viewingProf.Benefits && viewingProf.Benefits.length > 0 ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {viewingProf.Benefits.map(b => (
+                        <span key={b.id} style={{ background: '#e3f2fd', color: '#1976d2', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '500' }}>
+                          {b.name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ margin: 0, color: '#888', fontStyle: 'italic' }}>No tiene prestaciones asignadas.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Address section */}
+              <div>
+                <h3 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '10px' }}>Dirección</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px' }}>
+                   <p style={{ margin: 0, gridColumn: '1 / -1' }}><strong>Calle y Nro:</strong> {viewingProf.street ? `${viewingProf.street} ${viewingProf.number || ''}`.trim() : 'Sin especificar'}</p>
+                   <p style={{ margin: 0 }}><strong>Piso:</strong> {viewingProf.floor || '-'}</p>
+                   <p style={{ margin: 0 }}><strong>Depto:</strong> {viewingProf.apartment || '-'}</p>
+                   <p style={{ margin: 0 }}><strong>Ciudad:</strong> {viewingProf.city || 'Sin especificar'}</p>
+                   <p style={{ margin: 0 }}><strong>Provincia:</strong> {viewingProf.province || 'Sin especificar'}</p>
+                   <p style={{ margin: 0 }}><strong>C. Postal:</strong> {viewingProf.postalCode || 'Sin especificar'}</p>
+                </div>
+              </div>
+
+              {/* Documents section */}
+              <div>
+                <h3 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '10px' }}>Documentos Adjuntos</h3>
+                <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '15px', backgroundColor: '#f9f9f9' }}>
+                  {viewingProf.ProfessionalDocuments && viewingProf.ProfessionalDocuments.length > 0 ? (
+                    <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                      {viewingProf.ProfessionalDocuments.map(doc => (
+                        <li key={doc.id} style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <button 
+                            type="button" 
+                            onClick={() => {
+                              const fullDoc = { ...doc, originalName: doc.originalName || doc.fileName, fileUrl: doc.fileUrl || doc.fileName };
+                              setShowingDoc(fullDoc);
+                            }}
+                            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--light-blue)', textDecoration: 'none', fontWeight: 'bold', cursor: 'pointer', textAlign: 'left' }}
+                          >
+                            {doc.originalName || doc.fileName}
+                          </button>
+                          {doc.ProfDocType?.name && (
+                            <span style={{ fontSize: '0.7rem', background: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: '6px', fontWeight: 'bold', border: '1px solid #cbd5e1' }}>
+                              {doc.ProfDocType.name}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p style={{ margin: 0, color: '#888', fontStyle: 'italic' }}>No hay documentos adjuntos.</p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
