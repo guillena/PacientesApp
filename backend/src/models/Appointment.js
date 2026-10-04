@@ -31,6 +31,10 @@ const Appointment = sequelize.define('Appointment', {
     type: DataTypes.BOOLEAN,
     defaultValue: false
   },
+  paid: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
   repetitionId: {
     type: DataTypes.STRING,
     allowNull: true

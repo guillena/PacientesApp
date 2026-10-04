@@ -89,6 +89,13 @@ sequelize.sync().then(async () => {
       });
       console.log('[Migration] Added column "confirmed" to Appointments table successfully');
     }
+    if (!tableDescription.paid) {
+      await queryInterface.addColumn('Appointments', 'paid', {
+        type: require('sequelize').DataTypes.BOOLEAN,
+        defaultValue: false
+      });
+      console.log('[Migration] Added column "paid" to Appointments table successfully');
+    }
   } catch (migErr) {
     console.log('[Migration check]', migErr.message);
   }

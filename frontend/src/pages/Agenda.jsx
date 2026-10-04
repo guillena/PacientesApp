@@ -5,7 +5,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import api from '../api';
 import { useAuth } from '../store/AuthContext';
-import { X, Trash2, CheckCircle2, CheckCheck } from 'lucide-react';
+import { X, Trash2, CheckCircle2, CheckCheck, DollarSign } from 'lucide-react';
 import MessageModal from '../components/MessageModal';
 
 const Agenda = () => {
@@ -33,7 +33,8 @@ const Agenda = () => {
     notes: '',
     repetitions: 1,
     attended: false,
-    confirmed: false
+    confirmed: false,
+    paid: false
   });
 
   const [birthdayEvents, setBirthdayEvents] = useState([]);
@@ -187,7 +188,8 @@ const Agenda = () => {
       notes: '',
       repetitions: 1,
       attended: false,
-      confirmed: false
+      confirmed: false,
+      paid: false
     });
     setShowModal(true);
   };
@@ -213,7 +215,8 @@ const Agenda = () => {
       notes: app.notes || '',
       repetitions: 1,
       attended: !!app.attended,
-      confirmed: !!app.confirmed
+      confirmed: !!app.confirmed,
+      paid: !!app.paid
     });
     setShowModal(true);
   };
@@ -237,6 +240,7 @@ const Agenda = () => {
       timeStr: `${formatTime(sDate)} - ${formatTime(eDate)} hs`,
       confirmed: !!props.confirmed,
       attended: !!props.attended,
+      paid: !!props.paid,
       backgroundColor: bg
     });
   };
@@ -298,6 +302,7 @@ const Agenda = () => {
           notes: formData.notes,
           attended: formData.attended,
           confirmed: formData.confirmed,
+          paid: formData.paid,
           repetitionId: repId
         };
 
@@ -420,10 +425,10 @@ const Agenda = () => {
           buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', workWeek: 'Laboral', day: 'Día' }}
           eventBackgroundColor="var(--salmon)"
           eventBorderColor="transparent"
-          height="700px"
+          height="auto"
           eventContent={(eventInfo) => {
-            const isAttended = eventInfo.event.extendedProps.attended;
             const isConfirmed = eventInfo.event.extendedProps.confirmed;
+            const isPaid = eventInfo.event.extendedProps.paid;
             return (
               <div style={{ 
                 padding: '2px 4px', 
@@ -435,8 +440,8 @@ const Agenda = () => {
                 gap: '4px',
                 width: '100%'
               }}>
+                {isPaid && <DollarSign size={14} strokeWidth={2.5} style={{ flexShrink: 0, color: '#15803d' }} title="Turno Pagado" />}
                 {isConfirmed && <CheckCheck size={14} style={{ flexShrink: 0, color: '#ffffff' }} title="Turno Confirmado" />}
-                {isAttended && <CheckCircle2 size={14} style={{ flexShrink: 0 }} title="Asistió" />}
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {eventInfo.event.title}
                 </span>
@@ -476,6 +481,26 @@ const Agenda = () => {
               {hoveredTooltip.confirmed ? (
                 <span style={{ backgroundColor: 'rgba(255,255,255,0.25)', padding: '2px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
                   <CheckCheck size={14} /> Sí
+                </span>
+              ) : (
+                <span style={{ opacity: 0.85 }}>No</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+              <strong>¿Asistió?:</strong>
+              {hoveredTooltip.attended ? (
+                <span style={{ backgroundColor: 'rgba(255,255,255,0.25)', padding: '2px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
+                  <CheckCircle2 size={14} /> Sí
+                </span>
+              ) : (
+                <span style={{ opacity: 0.85 }}>No</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+              <strong>¿Pagó?:</strong>
+              {hoveredTooltip.paid ? (
+                <span style={{ backgroundColor: 'rgba(255,255,255,0.25)', padding: '2px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
+                  <DollarSign size={14} /> Sí
                 </span>
               ) : (
                 <span style={{ opacity: 0.85 }}>No</span>
@@ -609,15 +634,15 @@ const Agenda = () => {
               </div>
 
               {/* Row 4: Status Checkboxes */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
                 <div style={{ 
-                  padding: '8px 12px', 
+                  padding: '8px 10px', 
                   borderRadius: '8px', 
                   backgroundColor: '#f0fdf4', 
                   border: '1px solid #bbf7d0', 
                   display: 'flex', 
                   alignItems: 'center', 
-                  gap: '0.8rem',
+                  gap: '0.6rem',
                   height: '42px'
                 }}>
                   <input 
@@ -627,19 +652,19 @@ const Agenda = () => {
                     onChange={(e) => setFormData({...formData, confirmed: e.target.checked})}
                     style={{ width: '18px', height: '18px', cursor: 'pointer', margin: 0 }}
                   />
-                  <label htmlFor="confirmed" style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#15803d', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}>
+                  <label htmlFor="confirmed" style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#15803d', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', margin: 0, whiteSpace: 'nowrap' }}>
                     <CheckCheck size={16} /> ¿Confirmó?
                   </label>
                 </div>
 
                 <div style={{ 
-                  padding: '8px 12px', 
+                  padding: '8px 10px', 
                   borderRadius: '8px', 
                   backgroundColor: '#f0f9ff', 
                   border: '1px solid #bae6fd', 
                   display: 'flex', 
                   alignItems: 'center', 
-                  gap: '0.8rem',
+                  gap: '0.6rem',
                   height: '42px'
                 }}>
                   <input 
@@ -649,8 +674,30 @@ const Agenda = () => {
                     onChange={(e) => setFormData({...formData, attended: e.target.checked})}
                     style={{ width: '18px', height: '18px', cursor: 'pointer', margin: 0 }}
                   />
-                  <label htmlFor="attended" style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#0369a1', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}>
+                  <label htmlFor="attended" style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#0369a1', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', margin: 0, whiteSpace: 'nowrap' }}>
                     <CheckCircle2 size={16} /> ¿Asistió?
+                  </label>
+                </div>
+
+                <div style={{ 
+                  padding: '8px 10px', 
+                  borderRadius: '8px', 
+                  backgroundColor: '#fefce8', 
+                  border: '1px solid #fef08a', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.6rem',
+                  height: '42px'
+                }}>
+                  <input 
+                    type="checkbox" 
+                    id="paid"
+                    checked={formData.paid}
+                    onChange={(e) => setFormData({...formData, paid: e.target.checked})}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer', margin: 0 }}
+                  />
+                  <label htmlFor="paid" style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#854d0e', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', margin: 0, whiteSpace: 'nowrap' }}>
+                    <DollarSign size={16} /> ¿Pagó?
                   </label>
                 </div>
               </div>
