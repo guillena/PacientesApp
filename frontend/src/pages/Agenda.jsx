@@ -9,6 +9,33 @@ import { X, Trash2, CheckCircle2, CheckCheck, DollarSign, Eye } from 'lucide-rea
 import MessageModal from '../components/MessageModal';
 import PatientDetailModal from '../components/PatientDetailModal';
 
+const REPETITION_OPTIONS = [
+  // Semanales
+  { value: 'weekly_1', label: '1 sesión semanal' },
+  { value: 'weekly_2', label: '2 sesiones semanales' },
+  { value: 'weekly_3', label: '3 sesiones semanales' },
+  { value: 'weekly_4', label: '4 sesiones semanales' },
+  { value: 'weekly_5', label: '5 sesiones semanales' },
+  { value: 'weekly_6', label: '6 sesiones semanales' },
+  { value: 'weekly_7', label: '7 sesiones semanales' },
+  { value: 'weekly_8', label: '8 sesiones semanales' },
+  { value: 'weekly_9', label: '9 sesiones semanales' },
+  { value: 'weekly_10', label: '10 sesiones semanales' },
+
+  // Cada 15 días (cada 14 días para mantener día de la semana)
+  { value: 'biweekly_1', label: '1 vez cada 15 días' },
+  { value: 'biweekly_2', label: '2 veces cada 15 días' },
+  { value: 'biweekly_3', label: '3 veces cada 15 días' },
+  { value: 'biweekly_4', label: '4 veces cada 15 días' },
+  { value: 'biweekly_5', label: '5 veces cada 15 días' },
+  { value: 'biweekly_6', label: '6 veces cada 15 días' },
+
+  // Al mes (mismo día calendario del mes siguiente)
+  { value: 'monthly_1', label: '1 vez al mes' },
+  { value: 'monthly_2', label: '2 veces una vez por mes' },
+  { value: 'monthly_3', label: '3 veces una vez por mes' },
+];
+
 const Agenda = () => {
   const { user } = useAuth();
   const [events, setEvents] = useState([]);
@@ -34,7 +61,7 @@ const Agenda = () => {
     startTime: '',
     endTime: '',
     notes: '',
-    repetitions: 1,
+    repetitions: 'weekly_1',
     attended: false,
     confirmed: false,
     paid: false
@@ -216,7 +243,7 @@ const Agenda = () => {
       startTime: startDate.toTimeString().substring(0, 5),
       endTime: endDate.toTimeString().substring(0, 5),
       notes: '',
-      repetitions: 1,
+      repetitions: 'weekly_1',
       attended: false,
       confirmed: false,
       paid: false
@@ -243,7 +270,7 @@ const Agenda = () => {
       startTime: sDate.toTimeString().substring(0, 5),
       endTime: eDate.toTimeString().substring(0, 5),
       notes: app.notes || '',
-      repetitions: 1,
+      repetitions: 'weekly_1',
       attended: !!app.attended,
       confirmed: !!app.confirmed,
       paid: !!app.paid
@@ -286,11 +313,23 @@ const Agenda = () => {
         alert('Por favor, selecciona paciente, prestación, fecha y horarios.');
         return;
       }
-      const reps = parseInt(formData.repetitions, 10) || 1;
+      // Parse repetition
+      let repCount = 1;
+      let repType = 'weekly';
+      const repVal = formData.repetitions === 1 || formData.repetitions === '1' ? 'weekly_1' : (formData.repetitions || 'weekly_1');
+      if (typeof repVal === 'string' && repVal.includes('_')) {
+        const [t, c] = repVal.split('_');
+        repType = t;
+        repCount = parseInt(c, 10) || 1;
+      } else {
+        repCount = parseInt(repVal, 10) || 1;
+        repType = 'weekly';
+      }
+
       const promises = [];
       
       let repId = null;
-      if (reps > 1) {
+      if (repCount > 1) {
         const currentEvent = editingId ? events.find(e => e.id === editingId) : null;
         repId = currentEvent?.extendedProps?.repetitionId || (window.crypto ? window.crypto.randomUUID() : Math.random().toString(36).substring(2, 11));
       } else if (editingId) {
@@ -299,12 +338,38 @@ const Agenda = () => {
         repId = currentEvent?.extendedProps?.repetitionId;
       }
 
-      for (let i = 0; i < reps; i++) {
-        const currentStartDate = new Date(`${formData.date}T${formData.startTime}:00`);
-        const currentEndDate = new Date(`${formData.date}T${formData.endTime}:00`);
-        
-        currentStartDate.setDate(currentStartDate.getDate() + (i * 7));
-        currentEndDate.setDate(currentEndDate.getDate() + (i * 7));
+      const [yearStr, monthStr, dayStr] = formData.date.split('-');
+      const baseYear = parseInt(yearStr, 10);
+      const baseMonth = parseInt(monthStr, 10) - 1; // 0-indexed
+      const baseDay = parseInt(dayStr, 10);
+
+      for (let i = 0; i < repCount; i++) {
+        let currentStartDate;
+        let currentEndDate;
+
+        if (repType === 'weekly') {
+          currentStartDate = new Date(`${formData.date}T${formData.startTime}:00`);
+          currentEndDate = new Date(`${formData.date}T${formData.endTime}:00`);
+          currentStartDate.setDate(currentStartDate.getDate() + (i * 7));
+          currentEndDate.setDate(currentEndDate.getDate() + (i * 7));
+        } else if (repType === 'biweekly') {
+          // Cada 14 días (mantiene el mismo día de la semana cada 2 semanas)
+          currentStartDate = new Date(`${formData.date}T${formData.startTime}:00`);
+          currentEndDate = new Date(`${formData.date}T${formData.endTime}:00`);
+          currentStartDate.setDate(currentStartDate.getDate() + (i * 14));
+          currentEndDate.setDate(currentEndDate.getDate() + (i * 14));
+        } else if (repType === 'monthly') {
+          // Mismo día calendario del mes siguiente
+          const targetTotalMonths = baseMonth + i;
+          const targetYear = baseYear + Math.floor(targetTotalMonths / 12);
+          const targetMonth = ((targetTotalMonths % 12) + 12) % 12;
+          const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+          const targetDay = Math.min(baseDay, daysInTargetMonth);
+
+          const targetDateStr = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
+          currentStartDate = new Date(`${targetDateStr}T${formData.startTime}:00`);
+          currentEndDate = new Date(`${targetDateStr}T${formData.endTime}:00`);
+        }
 
         const startTimeISO = currentStartDate.toISOString();
         const endTimeISO = currentEndDate.toISOString();
@@ -684,12 +749,12 @@ const Agenda = () => {
                 <div>
                   <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>Repetir sesiones</label>
                   <select 
-                    value={formData.repetitions}
+                    value={formData.repetitions === 1 || formData.repetitions === '1' ? 'weekly_1' : (formData.repetitions || 'weekly_1')}
                     onChange={e => setFormData({...formData, repetitions: e.target.value})}
                     style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: 'white' }}
                   >
-                    {[...Array(10)].map((_, i) => (
-                      <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'vez' : 'sesiones semanales'}</option>
+                    {REPETITION_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
                 </div>
