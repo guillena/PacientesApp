@@ -1,4 +1,4 @@
-const { Appointment, Patient, Benefit, Professional } = require('../models');
+const { Appointment, Patient, Benefit, Professional, PatientProfessional } = require('../models');
 const { Op } = require('sequelize');
 
 const createAppointment = async (req, res) => {
@@ -11,6 +11,18 @@ const createAppointment = async (req, res) => {
     // If admin, allow passing professionalId, if none passed, it remains admin's own ID
     if (req.professional.role === 'admin' && req.body.professionalId) {
       professionalId = req.body.professionalId;
+    }
+
+    if (req.professional.role !== 'admin') {
+      const isAssigned = await PatientProfessional.findOne({
+        where: {
+          patientId,
+          professionalId: req.professional.id
+        }
+      });
+      if (!isAssigned) {
+        return res.status(403).send({ error: 'No tienes asignado a este paciente para crear turnos.' });
+      }
     }
 
     const appointment = await Appointment.create({
@@ -73,8 +85,21 @@ const updateAppointment = async (req, res) => {
     if (!appointment) return res.status(404).send();
 
     // Check permissions
-    if (req.professional.role !== 'admin' && appointment.professionalId !== req.professional.id) {
-      return res.status(403).send({ error: 'No permissions' });
+    if (req.professional.role !== 'admin') {
+      if (appointment.professionalId !== req.professional.id) {
+        return res.status(403).send({ error: 'No tienes permisos para editar turnos de otro profesional.' });
+      }
+
+      const targetPatientId = req.body.patientId || appointment.patientId;
+      const isAssigned = await PatientProfessional.findOne({
+        where: {
+          patientId: targetPatientId,
+          professionalId: req.professional.id
+        }
+      });
+      if (!isAssigned) {
+        return res.status(403).send({ error: 'No tienes asignado a este paciente para editar este turno.' });
+      }
     }
 
     await appointment.update(req.body);

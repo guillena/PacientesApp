@@ -74,8 +74,11 @@ const Agenda = () => {
 
   const fetchDependencies = async () => {
     try {
+      const ptsUrl = user.role === 'admin' 
+        ? '/patients?all=true' 
+        : '/patients?includeProfessionals=true';
       const [pts, bnts] = await Promise.all([
-        api.get('/patients?all=true&includeProfessionals=true'),
+        api.get(ptsUrl),
         api.get('/benefits')
       ]);
       const sortedPatients = (pts.data || []).sort((a, b) => {
@@ -219,12 +222,8 @@ const Agenda = () => {
       const sorted = [...activePatients].sort(sortByName);
       defaultPatientId = sorted.length > 0 ? sorted[0].id : '';
     } else {
-      const myActive = activePatients.filter(p => p.Professionals?.some(pr => pr.id === user.id)).sort(sortByName);
-      if (myActive.length > 0) {
-        defaultPatientId = myActive[0].id;
-      } else if (activePatients.length > 0) {
-        defaultPatientId = [...activePatients].sort(sortByName)[0].id;
-      }
+      const myActive = activePatients.filter(p => !p.Professionals || p.Professionals.some(pr => pr.id === user.id)).sort(sortByName);
+      defaultPatientId = myActive.length > 0 ? myActive[0].id : '';
     }
 
     setEditingId(null);
@@ -250,6 +249,14 @@ const Agenda = () => {
     if (info.event.extendedProps.isBirthday) return;
     const app = info.event.extendedProps;
     
+    if (user.role !== 'admin') {
+      const isAssigned = patients.some(p => p.id === app.patientId && (!p.Professionals || p.Professionals.some(pr => pr.id === user.id)));
+      if (!isAssigned) {
+        alert('No tienes asignado a este paciente. No puedes editar este turno.');
+        return;
+      }
+    }
+
     // Convert UTC Date to local HTML format for inputs
     const sDate = new Date(app.startTime);
     const eDate = new Date(app.endTime);
@@ -306,6 +313,14 @@ const Agenda = () => {
       if (!formData.patientId || !formData.benefitId || !formData.date || !formData.startTime || !formData.endTime) {
         alert('Por favor, selecciona paciente, prestación, fecha y horarios.');
         return;
+      }
+
+      if (user.role !== 'admin') {
+        const isAssigned = patients.some(p => p.id === formData.patientId && (!p.Professionals || p.Professionals.some(pr => pr.id === user.id)));
+        if (!isAssigned) {
+          alert('No tienes asignado a este paciente. No puedes crear o editar un turno para él.');
+          return;
+        }
       }
       // Parse repetition
       let repCount = 1;
@@ -672,37 +687,14 @@ const Agenda = () => {
                         })
                         .map(p => <option key={p.id} value={p.id}>{p.lastName}, {p.firstName}</option>)
                     ) : (
-                      (() => {
-                        const available = patients.filter(p => !p.isInactive || p.id === formData.patientId);
-                        const isMyPatient = (p) => p.Professionals?.some(prof => prof.id === user.id);
-                        const sortByName = (a, b) => {
+                      patients
+                        .filter(p => (!p.isInactive || p.id === formData.patientId) && (!p.Professionals || p.Professionals.some(prof => prof.id === user.id)))
+                        .sort((a, b) => {
                           const nameA = `${a.lastName || ''}, ${a.firstName || ''}`.trim();
                           const nameB = `${b.lastName || ''}, ${b.firstName || ''}`.trim();
                           return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
-                        };
-
-                        const myPatients = available.filter(isMyPatient).sort(sortByName);
-                        const otherPatients = available.filter(p => !isMyPatient(p)).sort(sortByName);
-
-                        return (
-                          <>
-                            {myPatients.length > 0 && (
-                              <optgroup label="Mis Pacientes">
-                                {myPatients.map(p => (
-                                  <option key={p.id} value={p.id}>{p.lastName}, {p.firstName}</option>
-                                ))}
-                              </optgroup>
-                            )}
-                            {otherPatients.length > 0 && (
-                              <optgroup label="Otros Pacientes">
-                                {otherPatients.map(p => (
-                                  <option key={p.id} value={p.id}>{p.lastName}, {p.firstName}</option>
-                                ))}
-                              </optgroup>
-                            )}
-                          </>
-                        );
-                      })()
+                        })
+                        .map(p => <option key={p.id} value={p.id}>{p.lastName}, {p.firstName}</option>)
                     )}
                   </select>
                 </div>
