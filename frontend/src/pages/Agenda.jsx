@@ -16,11 +16,6 @@ const REPETITION_OPTIONS = [
   { value: 'weekly_3', label: 'Semanal, 3 sesiones' },
   { value: 'weekly_4', label: 'Semanal, 4 sesiones' },
   { value: 'weekly_5', label: 'Semanal, 5 sesiones' },
-  { value: 'weekly_6', label: 'Semanal, 6 sesiones' },
-  { value: 'weekly_7', label: 'Semanal, 7 sesiones' },
-  { value: 'weekly_8', label: 'Semanal, 8 sesiones' },
-  { value: 'weekly_9', label: 'Semanal, 9 sesiones' },
-  { value: 'weekly_10', label: 'Semanal, 10 sesiones' },
 
   // Quincenales (cada 14 días para mantener día de la semana)
   { value: 'biweekly_1', label: 'Quincenal, 1 sesión' },
@@ -28,7 +23,6 @@ const REPETITION_OPTIONS = [
   { value: 'biweekly_3', label: 'Quincenal, 3 sesiones' },
   { value: 'biweekly_4', label: 'Quincenal, 4 sesiones' },
   { value: 'biweekly_5', label: 'Quincenal, 5 sesiones' },
-  { value: 'biweekly_6', label: 'Quincenal, 6 sesiones' },
 
   // Mensuales (mismo día calendario del mes siguiente)
   { value: 'monthly_1', label: 'Mensual, 1 sesión' },
