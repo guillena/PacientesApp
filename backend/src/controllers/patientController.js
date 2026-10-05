@@ -77,23 +77,28 @@ const getPatients = async (req, res) => {
       where.id = { [Op.in]: assignedPatientIds };
     }
 
+    const include = [
+      { model: DocumentType },
+      { model: PatientDocument },
+      { model: Activity, attributes: ['id'] },
+      { model: PatientTest, attributes: ['id'] }
+    ];
+
+    if (req.query.includeProfessionals === 'true') {
+      include.push({
+        model: Professional,
+        attributes: ['id', 'firstName', 'lastName', 'username', 'role', 'color'],
+        through: { attributes: [] }
+      });
+    }
+
     const patients = await Patient.findAll({
       where,
       order: [
         ['lastName', 'ASC'],
         ['firstName', 'ASC']
       ],
-      include: [
-        { model: DocumentType },
-        { model: PatientDocument },
-        { model: Activity, attributes: ['id'] },
-        { model: PatientTest, attributes: ['id'] },
-        {
-          model: Professional,
-          attributes: ['id', 'firstName', 'lastName', 'username', 'role', 'color'],
-          through: { attributes: [] }
-        }
-      ]
+      include
     });
     res.send(patients);
   } catch (e) {

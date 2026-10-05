@@ -1042,23 +1042,6 @@ const Patients = () => {
                     </div>
                     {p.isInactive && <span style={{ fontSize: '0.7rem', backgroundColor: '#fee2e2', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', border: '1px solid #fca5a5' }}>INACTIVO</span>}
                   </div>
-                  {p.Professionals && p.Professionals.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
-                      {p.Professionals.map(prof => (
-                        <span key={prof.id} style={{
-                          fontSize: '0.7rem',
-                          backgroundColor: '#f1f5f9',
-                          color: '#475569',
-                          padding: '1px 6px',
-                          borderRadius: '4px',
-                          border: '1px solid #e2e8f0',
-                          fontWeight: 'normal'
-                        }}>
-                          {prof.lastName}, {prof.firstName}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </td>
                 <td style={{ padding: '1rem' }}>
                   <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--dark-text)' }}>{formatDocument(p.docNumber)}</div>
@@ -1213,25 +1196,6 @@ const Patients = () => {
                 {(p.city || p.province || p.street) && (
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px', color: '#555', fontSize: '0.9rem' }}>
                     <span style={{ fontWeight: 'bold', minWidth: '70px', color: '#444' }}>Ciudad:</span> {p.city || p.province || p.street}
-                  </div>
-                )}
-                {p.Professionals && p.Professionals.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', color: '#555', fontSize: '0.9rem' }}>
-                    <span style={{ fontWeight: 'bold', minWidth: '85px', color: '#444' }}>Profesionales:</span>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                      {p.Professionals.map(prof => (
-                        <span key={prof.id} style={{
-                          fontSize: '0.75rem',
-                          backgroundColor: '#eff6ff',
-                          color: '#1d4ed8',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          border: '1px solid #bfdbfe'
-                        }}>
-                          {prof.lastName}, {prof.firstName}
-                        </span>
-                      ))}
-                    </div>
                   </div>
                 )}
               </div>

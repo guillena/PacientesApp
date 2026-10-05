@@ -54,7 +54,7 @@ const Agenda = () => {
   const fetchDependencies = async () => {
     try {
       const [pts, bnts] = await Promise.all([
-        api.get('/patients?all=true'),
+        api.get('/patients?all=true&includeProfessionals=true'),
         api.get('/benefits')
       ]);
       const sortedPatients = (pts.data || []).sort((a, b) => {

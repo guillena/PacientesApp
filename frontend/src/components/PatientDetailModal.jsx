@@ -52,7 +52,7 @@ const PatientDetailModal = ({ isOpen, patient, onClose, onViewDocument, tests, i
     }
 
     // If patient object is missing associations or is just an ID, fetch complete patient details
-    if (typeof patient !== 'object' || !patient.DocumentType || !patient.PatientDocuments) {
+    if (typeof patient !== 'object' || !patient.DocumentType || !patient.PatientDocuments || !patient.Professionals) {
       api.get(`/patients/${patId}`)
         .then(res => setPatientData(res.data))
         .catch(err => console.error('Error fetching patient details:', err));
