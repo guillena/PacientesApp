@@ -459,7 +459,6 @@ const Agenda = () => {
           eventContent={(eventInfo) => {
             const isConfirmed = eventInfo.event.extendedProps.confirmed;
             const isPaid = eventInfo.event.extendedProps.paid;
-            const isAttended = eventInfo.event.extendedProps.attended;
             return (
               <div style={{ 
                 padding: '2px 4px', 
@@ -473,7 +472,6 @@ const Agenda = () => {
               }}>
                 {isPaid && <DollarSign size={14} strokeWidth={2.5} style={{ flexShrink: 0, color: '#15803d' }} title="Turno Pagado" />}
                 {isConfirmed && <CheckCheck size={14} style={{ flexShrink: 0, color: '#ffffff' }} title="Turno Confirmado" />}
-                {isAttended && <CheckCircle2 size={14} style={{ flexShrink: 0 }} title="Asistió" />}
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {eventInfo.event.title}
                 </span>
