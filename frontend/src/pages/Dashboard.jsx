@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../store/AuthContext';
-import { Calendar as CalendarIcon, Users, ArrowRight, CheckCircle2, CheckCheck, DollarSign, Edit3, Trash2, Mail } from 'lucide-react';
+import { Calendar as CalendarIcon, Users, ArrowRight, CheckCircle2, Edit3, Trash2, Mail } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
@@ -359,23 +359,7 @@ const Dashboard = () => {
                   <p style={{ fontWeight: '600' }}>{app.Patient?.firstName} {app.Patient?.lastName}</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <p style={{ fontSize: '0.85rem', opacity: 0.7 }}>{app.Benefit?.name}</p>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                      {app.confirmed && (
-                        <span title="Confirmó" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#16a34a', color: '#fff', borderRadius: '4px', padding: '1px 3px' }}>
-                          <CheckCheck size={11} strokeWidth={2.5} />
-                        </span>
-                      )}
-                      {app.attended && (
-                        <span title="Asistió" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0284c7', color: '#fff', borderRadius: '4px', padding: '1px 3px' }}>
-                          <CheckCircle2 size={11} strokeWidth={2.5} />
-                        </span>
-                      )}
-                      {app.paid && (
-                        <span title="Pagó" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#eab308', color: '#713f12', borderRadius: '4px', padding: '1px 3px', fontWeight: 'bold' }}>
-                          <DollarSign size={11} strokeWidth={3} />
-                        </span>
-                      )}
-                    </div>
+                    {app.attended && <CheckCircle2 size={14} color="#059669" />}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>

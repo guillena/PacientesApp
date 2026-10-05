@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { Search, UserPlus, Edit3, X, ArrowUpDown, ArrowUp, ArrowDown, Activity, List, Grid, Eye, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCw, Crop, FileText, FilePlus, Trash2, Calendar, CheckCircle2, CheckCheck, DollarSign, MoreVertical, ClipboardList, Upload, Mic, MicOff, QrCode } from 'lucide-react';
+import { Search, UserPlus, Edit3, X, ArrowUpDown, ArrowUp, ArrowDown, Activity, List, Grid, Eye, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCw, Crop, FileText, FilePlus, Trash2, Calendar, CheckCircle2, MoreVertical, ClipboardList, Upload, Mic, MicOff, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import MessageModal from '../components/MessageModal';
 import PatientDetailModal from '../components/PatientDetailModal';
@@ -2010,9 +2010,7 @@ const Patients = () => {
                       <th style={{ padding: '12px' }}>Hora</th>
                       <th style={{ padding: '12px' }}>Profesional</th>
                       <th style={{ padding: '12px' }}>Prestación</th>
-                      <th style={{ padding: '12px', textAlign: 'center' }}>Confirmó</th>
                       <th style={{ padding: '12px', textAlign: 'center' }}>Asistió</th>
-                      <th style={{ padding: '12px', textAlign: 'center' }}>Pagó</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2038,28 +2036,8 @@ const Patients = () => {
                             {session.Benefit?.name}
                           </td>
                           <td style={{ padding: '12px', textAlign: 'center' }}>
-                            {session.confirmed ? (
-                              <span title="Confirmó" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#16a34a', color: '#fff', borderRadius: '4px', padding: '2px 5px' }}>
-                                <CheckCheck size={14} strokeWidth={2.5} />
-                              </span>
-                            ) : (
-                              <span style={{ opacity: 0.3 }}>-</span>
-                            )}
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'center' }}>
                             {session.attended ? (
-                              <span title="Asistió" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0284c7', color: '#fff', borderRadius: '4px', padding: '2px 5px' }}>
-                                <CheckCircle2 size={14} strokeWidth={2.5} />
-                              </span>
-                            ) : (
-                              <span style={{ opacity: 0.3 }}>-</span>
-                            )}
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'center' }}>
-                            {session.paid ? (
-                              <span title="Pagó" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#eab308', color: '#713f12', borderRadius: '4px', padding: '2px 5px', fontWeight: 'bold' }}>
-                                <DollarSign size={14} strokeWidth={3} />
-                              </span>
+                              <CheckCircle2 size={18} color="#059669" style={{ margin: 'auto' }} />
                             ) : (
                               <span style={{ opacity: 0.3 }}>-</span>
                             )}

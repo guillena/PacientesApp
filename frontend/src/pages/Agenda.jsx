@@ -457,25 +457,9 @@ const Agenda = () => {
           eventBorderColor="transparent"
           height="auto"
           eventContent={(eventInfo) => {
-            const props = eventInfo.event.extendedProps || {};
-            if (props.isTask || props.isBirthday) {
-              return (
-                <div style={{ 
-                  padding: '2px 4px', 
-                  overflow: 'hidden', 
-                  textOverflow: 'ellipsis', 
-                  whiteSpace: 'nowrap',
-                  fontSize: '0.85rem'
-                }}>
-                  {eventInfo.event.title}
-                </div>
-              );
-            }
-
-            const isConfirmed = props.confirmed;
-            const isAttended = props.attended;
-            const isPaid = props.paid;
-
+            const isConfirmed = eventInfo.event.extendedProps.confirmed;
+            const isPaid = eventInfo.event.extendedProps.paid;
+            const isAttended = eventInfo.event.extendedProps.attended;
             return (
               <div style={{ 
                 padding: '2px 4px', 
@@ -484,73 +468,12 @@ const Agenda = () => {
                 whiteSpace: 'nowrap',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
-                width: '100%',
-                fontSize: '0.82rem',
-                lineHeight: 1.2
+                gap: '4px',
+                width: '100%'
               }}>
-                {/* Badges container with high-contrast pills */}
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
-                  {isConfirmed && (
-                    <span 
-                      title="Turno Confirmado"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: '#16a34a',
-                        color: '#ffffff',
-                        borderRadius: '4px',
-                        padding: '1px 3px',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
-                      }}
-                    >
-                      <CheckCheck size={12} strokeWidth={2.5} />
-                    </span>
-                  )}
-                  {isAttended && (
-                    <span 
-                      title="Asistió"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: '#0284c7',
-                        color: '#ffffff',
-                        borderRadius: '4px',
-                        padding: '1px 3px',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
-                      }}
-                    >
-                      <CheckCircle2 size={12} strokeWidth={2.5} />
-                    </span>
-                  )}
-                  {isPaid && (
-                    <span 
-                      title="Turno Pagado"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: '#eab308',
-                        color: '#713f12',
-                        borderRadius: '4px',
-                        padding: '1px 3px',
-                        fontWeight: 'bold',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
-                      }}
-                    >
-                      <DollarSign size={12} strokeWidth={3} />
-                    </span>
-                  )}
-                </div>
-
-                {eventInfo.timeText && (
-                  <span style={{ fontWeight: 600, fontSize: '0.78rem', opacity: 0.9, flexShrink: 0 }}>
-                    {eventInfo.timeText}
-                  </span>
-                )}
-
+                {isPaid && <DollarSign size={14} strokeWidth={2.5} style={{ flexShrink: 0, color: '#15803d' }} title="Turno Pagado" />}
+                {isConfirmed && <CheckCheck size={14} style={{ flexShrink: 0, color: '#ffffff' }} title="Turno Confirmado" />}
+                {isAttended && <CheckCircle2 size={14} style={{ flexShrink: 0 }} title="Asistió" />}
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {eventInfo.event.title}
                 </span>
@@ -567,56 +490,52 @@ const Agenda = () => {
             top: hoveredTooltip.y,
             left: hoveredTooltip.x,
             transform: 'translate(-50%, -100%)',
-            backgroundColor: '#0f172a',
-            color: '#f8fafc',
-            padding: '12px 16px',
+            backgroundColor: hoveredTooltip.backgroundColor,
+            color: '#ffffff',
+            padding: '10px 14px',
             borderRadius: '10px',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
             zIndex: 9999,
             pointerEvents: 'none',
             fontSize: '0.85rem',
-            minWidth: '240px',
-            border: '1px solid #334155',
-            borderTop: `4px solid ${hoveredTooltip.backgroundColor || '#6366f1'}`
+            minWidth: '220px',
+            border: '1px solid rgba(255,255,255,0.3)'
           }}
         >
-          <div style={{ fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '8px', borderBottom: '1px solid #334155', paddingBottom: '6px', color: '#ffffff' }}>
+          <div style={{ fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.3)', paddingBottom: '4px' }}>
             👤 {hoveredTooltip.patientName}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            <div style={{ color: '#cbd5e1' }}><strong style={{ color: '#f1f5f9' }}>👨‍⚕️ Profesional:</strong> {hoveredTooltip.professionalName}</div>
-            <div style={{ color: '#cbd5e1' }}><strong style={{ color: '#f1f5f9' }}>⏰ Horario:</strong> {hoveredTooltip.timeStr}</div>
-            
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px', paddingTop: '4px', borderTop: '1px dashed #334155' }}>
-              <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>¿Confirmó?:</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div><strong>👨‍⚕️ Profesional:</strong> {hoveredTooltip.professionalName}</div>
+            <div><strong>⏰ Horario:</strong> {hoveredTooltip.timeStr}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+              <strong>¿Confirmó?:</strong>
               {hoveredTooltip.confirmed ? (
-                <span style={{ backgroundColor: '#16a34a', color: '#ffffff', padding: '2px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 'bold', fontSize: '0.78rem' }}>
-                  <CheckCheck size={12} strokeWidth={2.5} /> Sí
+                <span style={{ backgroundColor: 'rgba(255,255,255,0.25)', padding: '2px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
+                  <CheckCheck size={14} /> Sí
                 </span>
               ) : (
-                <span style={{ backgroundColor: '#1e293b', color: '#94a3b8', border: '1px solid #334155', padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem' }}>No</span>
+                <span style={{ opacity: 0.85 }}>No</span>
               )}
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>¿Asistió?:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+              <strong>¿Asistió?:</strong>
               {hoveredTooltip.attended ? (
-                <span style={{ backgroundColor: '#0284c7', color: '#ffffff', padding: '2px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 'bold', fontSize: '0.78rem' }}>
-                  <CheckCircle2 size={12} strokeWidth={2.5} /> Sí
+                <span style={{ backgroundColor: 'rgba(255,255,255,0.25)', padding: '2px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
+                  <CheckCircle2 size={14} /> Sí
                 </span>
               ) : (
-                <span style={{ backgroundColor: '#1e293b', color: '#94a3b8', border: '1px solid #334155', padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem' }}>No</span>
+                <span style={{ opacity: 0.85 }}>No</span>
               )}
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>¿Pagó?:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+              <strong>¿Pagó?:</strong>
               {hoveredTooltip.paid ? (
-                <span style={{ backgroundColor: '#eab308', color: '#713f12', padding: '2px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 'bold', fontSize: '0.78rem' }}>
-                  <DollarSign size={12} strokeWidth={3} /> Sí
+                <span style={{ backgroundColor: 'rgba(255,255,255,0.25)', padding: '2px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
+                  <DollarSign size={14} /> Sí
                 </span>
               ) : (
-                <span style={{ backgroundColor: '#1e293b', color: '#94a3b8', border: '1px solid #334155', padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem' }}>No</span>
+                <span style={{ opacity: 0.85 }}>No</span>
               )}
             </div>
           </div>
@@ -625,11 +544,11 @@ const Agenda = () => {
             bottom: '-6px',
             left: '50%',
             transform: 'translateX(-50%) rotate(45deg)',
-            width: '10px',
-            height: '10px',
-            backgroundColor: '#0f172a',
-            borderRight: '1px solid #334155',
-            borderBottom: '1px solid #334155'
+            width: '12px',
+            height: '12px',
+            backgroundColor: hoveredTooltip.backgroundColor,
+            borderRight: '1px solid rgba(255,255,255,0.3)',
+            borderBottom: '1px solid rgba(255,255,255,0.3)'
           }} />
         </div>
       )}
