@@ -11,29 +11,29 @@ import PatientDetailModal from '../components/PatientDetailModal';
 
 const REPETITION_OPTIONS = [
   // Semanales
-  { value: 'weekly_1', label: '1 sesión semanal' },
-  { value: 'weekly_2', label: '2 sesiones semanales' },
-  { value: 'weekly_3', label: '3 sesiones semanales' },
-  { value: 'weekly_4', label: '4 sesiones semanales' },
-  { value: 'weekly_5', label: '5 sesiones semanales' },
-  { value: 'weekly_6', label: '6 sesiones semanales' },
-  { value: 'weekly_7', label: '7 sesiones semanales' },
-  { value: 'weekly_8', label: '8 sesiones semanales' },
-  { value: 'weekly_9', label: '9 sesiones semanales' },
-  { value: 'weekly_10', label: '10 sesiones semanales' },
+  { value: 'weekly_1', label: 'Semanal, 1 sesión' },
+  { value: 'weekly_2', label: 'Semanal, 2 sesiones' },
+  { value: 'weekly_3', label: 'Semanal, 3 sesiones' },
+  { value: 'weekly_4', label: 'Semanal, 4 sesiones' },
+  { value: 'weekly_5', label: 'Semanal, 5 sesiones' },
+  { value: 'weekly_6', label: 'Semanal, 6 sesiones' },
+  { value: 'weekly_7', label: 'Semanal, 7 sesiones' },
+  { value: 'weekly_8', label: 'Semanal, 8 sesiones' },
+  { value: 'weekly_9', label: 'Semanal, 9 sesiones' },
+  { value: 'weekly_10', label: 'Semanal, 10 sesiones' },
 
-  // Cada 15 días (cada 14 días para mantener día de la semana)
-  { value: 'biweekly_1', label: '1 vez cada 15 días' },
-  { value: 'biweekly_2', label: '2 veces cada 15 días' },
-  { value: 'biweekly_3', label: '3 veces cada 15 días' },
-  { value: 'biweekly_4', label: '4 veces cada 15 días' },
-  { value: 'biweekly_5', label: '5 veces cada 15 días' },
-  { value: 'biweekly_6', label: '6 veces cada 15 días' },
+  // Quincenales (cada 14 días para mantener día de la semana)
+  { value: 'biweekly_1', label: 'Quincenal, 1 sesión' },
+  { value: 'biweekly_2', label: 'Quincenal, 2 sesiones' },
+  { value: 'biweekly_3', label: 'Quincenal, 3 sesiones' },
+  { value: 'biweekly_4', label: 'Quincenal, 4 sesiones' },
+  { value: 'biweekly_5', label: 'Quincenal, 5 sesiones' },
+  { value: 'biweekly_6', label: 'Quincenal, 6 sesiones' },
 
-  // Al mes (mismo día calendario del mes siguiente)
-  { value: 'monthly_1', label: '1 vez al mes' },
-  { value: 'monthly_2', label: '2 veces una vez por mes' },
-  { value: 'monthly_3', label: '3 veces una vez por mes' },
+  // Mensuales (mismo día calendario del mes siguiente)
+  { value: 'monthly_1', label: 'Mensual, 1 sesión' },
+  { value: 'monthly_2', label: 'Mensual, 2 sesiones' },
+  { value: 'monthly_3', label: 'Mensual, 3 sesiones' },
 ];
 
 const Agenda = () => {
